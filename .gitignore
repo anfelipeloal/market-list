@@ -1,0 +1,2 @@
+# Junction to .agents/skills; recreate locally with: mklink /J .claude\skills .agents\skills
+.claude/skills
