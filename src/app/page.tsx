@@ -1,10 +1,8 @@
-import Link from "next/link";
-import { CategoryForm } from "./category-form";
 import { listCategories } from "@/db/categories";
 import { listProducts } from "@/db/products";
 import { buildPantryView } from "@/domain/catalog/pantry";
 import { requireUser } from "@/lib/session";
-import { ProductForm } from "./product-form";
+import { PantrySearch } from "./pantry-search";
 
 export default async function PantryPage() {
   // requireUser() reads the session cookie, which makes this route dynamic: the Pantry always
@@ -16,42 +14,7 @@ export default async function PantryPage() {
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Despensa</h1>
-
-      {pantry.length === 0 ? (
-        <p className="mt-6 text-muted-foreground">Todavía no hay categorías.</p>
-      ) : (
-        <ul className="mt-4 flex flex-col gap-4">
-          {pantry.map((category) => (
-            <li key={category.id} className="overflow-hidden rounded-xl border bg-card">
-              <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-                <h2 className="text-lg font-semibold">{category.name}</h2>
-                <Link href={`/categorias/${category.id}/editar`} className="text-sm text-muted-foreground underline">
-                  Editar
-                </Link>
-              </div>
-
-              {category.products.length > 0 ? (
-                <ul className="divide-y">
-                  {category.products.map((product) => (
-                    <li key={product.id} className="flex items-center justify-between gap-2 px-4 py-3 text-base">
-                      <span>{product.name}</span>
-                      <Link href={`/productos/${product.id}/editar`} className="text-sm text-muted-foreground underline">
-                        Editar
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <div className={category.products.length > 0 ? "border-t" : undefined}>
-                <ProductForm categoryId={category.id} categoryName={category.name} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <CategoryForm />
+      <PantrySearch pantry={pantry} />
     </main>
   );
 }
