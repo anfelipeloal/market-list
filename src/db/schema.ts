@@ -1,4 +1,4 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // Every table enables Row Level Security with no policies: the public key reaches nothing,
 // and only the Next.js server (privileged connection) reads or writes data. See ADR-0001.
@@ -9,6 +9,12 @@ export const categories = pgTable("categories", {
   normalizedName: text("normalized_name").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
+
+// A Product is always in exactly one of these three states (see CONTEXT.md and
+// src/domain/shopping/status.ts, which defines the allowed transitions between them). All three
+// values are defined now even though nothing sets "in_cart" until ticket #10, so that ticket adds
+// no enum migration of its own.
+export const productStatus = pgEnum("product_status", ["pantry", "shopping_list", "in_cart"]);
 
 // A Product's name is unique across every Category, not just its own (see CONTEXT.md), so the
 // unique constraint lives on the table rather than being scoped to categoryId. Deleting a
@@ -21,6 +27,7 @@ export const products = pgTable("products", {
   categoryId: uuid("category_id")
     .notNull()
     .references(() => categories.id, { onDelete: "restrict" }),
+  status: productStatus("status").notNull().default("pantry"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 

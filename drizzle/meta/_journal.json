@@ -29,6 +29,13 @@
       "when": 1789437675989,
       "tag": "0003_create_products",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789474472753,
+      "tag": "0004_add_product_status",
+      "breakpoints": true
     }
   ]
 }
