@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { namesMatch, normalizeName, sortByName } from "./names";
+import { cleanDisplayName, namesMatch, normalizeName, sortByName } from "./names";
+
+describe("stored display name", () => {
+  it("trims and collapses internal whitespace but keeps capitalization and accents", () => {
+    expect(cleanDisplayName("  Leche   Deslactosada ")).toBe("Leche Deslactosada");
+  });
+});
 
 describe("name matching", () => {
   it("treats names that differ only in capitalization as the same name", () => {

@@ -10,6 +10,20 @@ export const categories = pgTable("categories", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+// A Product's name is unique across every Category, not just its own (see CONTEXT.md), so the
+// unique constraint lives on the table rather than being scoped to categoryId. Deleting a
+// Category that still has Products is rejected at the database level (onDelete: "restrict");
+// deleting Categories at all is ticket #15.
+export const products = pgTable("products", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  normalizedName: text("normalized_name").notNull().unique(),
+  categoryId: uuid("category_id")
+    .notNull()
+    .references(() => categories.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
 // A User signs in by PIN alone, so the keyed PIN hash must be unique: it is the only
 // identifier. The PIN itself is never stored (see ADR-0001 and src/lib/pin-hash.ts).
 export const users = pgTable("users", {
