@@ -2,11 +2,11 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { isValidId } from "@/domain/ids";
-import { transitionRule, type ShoppingTransition } from "@/domain/shopping/status";
+import { transitionRule, type ProductStatus, type ShoppingTransition } from "@/domain/shopping/status";
 import { db } from "./client";
 import { categories, products } from "./schema";
 
-export type ProductRow = { id: string; name: string; categoryId: string; status: "pantry" | "shopping_list" | "in_cart" };
+export type ProductRow = { id: string; name: string; categoryId: string; status: ProductStatus };
 
 const PRODUCT_COLUMNS = {
   id: products.id,
@@ -94,9 +94,10 @@ export type ApplyProductTransitionResult =
 // conditional UPDATE: WHERE id = id AND status = <the transition's expected starting status>.
 // This is the race guard for status changes: if another request changed this Product's status
 // between the caller deciding to act and this UPDATE running, zero rows are affected and the
-// change is silently NOT applied, rather than clobbering whatever the other request set. A
-// malformed id can never match a row either, but is checked first (see src/domain/ids.ts) so it
-// is reported as "notFound" rather than folded into "stale".
+// change is silently NOT applied, rather than clobbering whatever the other request set. The
+// conditional UPDATE is the atomic guard against that race; it alone can't tell "no such Product"
+// apart from "found, but not in the expected status", since both affect zero rows the same way.
+// A malformed id never matches a row either, so it short-circuits to "notFound" without a query.
 export async function applyProductTransition(id: string, transition: ShoppingTransition): Promise<ApplyProductTransitionResult> {
   if (!isValidId(id)) return { outcome: "notFound" };
 
@@ -107,6 +108,10 @@ export async function applyProductTransition(id: string, transition: ShoppingTra
     .where(and(eq(products.id, id), eq(products.status, from)))
     .returning(PRODUCT_COLUMNS);
 
-  if (!product) return { outcome: "stale" };
-  return { outcome: "moved", product };
+  if (product) return { outcome: "moved", product };
+
+  // Zero rows affected: a follow-up read (outside the atomic guard, which has already done its
+  // job) tells apart the two possible reasons, so the caller can show the right message.
+  const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+  return existing ? { outcome: "stale" } : { outcome: "notFound" };
 }

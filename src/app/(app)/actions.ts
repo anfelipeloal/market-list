@@ -20,6 +20,7 @@ import { validateNewProduct } from "@/domain/catalog/create-product";
 import { validateProductMove } from "@/domain/catalog/move-product";
 import { validateCategoryRename } from "@/domain/catalog/rename-category";
 import { validateProductRename } from "@/domain/catalog/rename-product";
+import type { ProductStatus } from "@/domain/shopping/status";
 import { requireUser } from "@/lib/session";
 
 export type CreateCategoryState = { error: string } | undefined;
@@ -96,8 +97,10 @@ export async function createProduct(_prevState: CreateProductState, formData: Fo
     return duplicateProductState(outcome.existing.product, outcome.existing.category);
   }
 
+  // A new Product always starts in the Pantry (see src/db/products.ts#insertProduct), so it never
+  // affects the Shopping List: only "/" needs revalidating here, unlike moveToShoppingList and
+  // returnToPantry (src/app/(app)/shopping-actions.ts), which revalidate both.
   revalidatePath("/");
-  revalidatePath("/lista");
   return undefined;
 }
 
@@ -105,7 +108,7 @@ export async function createProduct(_prevState: CreateProductState, formData: Fo
 // src/domain/catalog/create-product.ts and CONTEXT.md): still in the Pantry offers the move,
 // already on the Shopping List or In Cart just says so.
 function duplicateProductState(
-  product: { id: string; name: string; status: "pantry" | "shopping_list" | "in_cart" },
+  product: { id: string; name: string; status: ProductStatus },
   category: { name: string },
 ): CreateProductState {
   if (product.status === "pantry") {

@@ -1,4 +1,5 @@
 import { boolean, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { PRODUCT_STATUSES } from "@/domain/shopping/status";
 
 // Every table enables Row Level Security with no policies: the public key reaches nothing,
 // and only the Next.js server (privileged connection) reads or writes data. See ADR-0001.
@@ -11,10 +12,11 @@ export const categories = pgTable("categories", {
 }).enableRLS();
 
 // A Product is always in exactly one of these three states (see CONTEXT.md and
-// src/domain/shopping/status.ts, which defines the allowed transitions between them). All three
-// values are defined now even though nothing sets "in_cart" until ticket #10, so that ticket adds
-// no enum migration of its own.
-export const productStatus = pgEnum("product_status", ["pantry", "shopping_list", "in_cart"]);
+// src/domain/shopping/status.ts, which defines the allowed transitions between them). The enum's
+// values are derived from PRODUCT_STATUSES, the domain's own list, so the database and the
+// domain type can never drift apart. All three values are defined now even though nothing sets
+// "in_cart" until ticket #10, so that ticket adds no enum migration of its own.
+export const productStatus = pgEnum("product_status", PRODUCT_STATUSES);
 
 // A Product's name is unique across every Category, not just its own (see CONTEXT.md), so the
 // unique constraint lives on the table rather than being scoped to categoryId. Deleting a
