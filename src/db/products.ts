@@ -1,6 +1,7 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
+import { isValidId } from "@/domain/ids";
 import { db } from "./client";
 import { categories, products } from "./schema";
 
@@ -44,9 +45,12 @@ export async function findProductWithCategoryByNormalizedName(
   };
 }
 
-// Preloads the Product being edited on the rename/move page; an unknown id renders a not-found
-// message rather than a 500.
+// Preloads the Product being edited on the rename/move page; an unknown OR malformed id renders a
+// not-found message rather than a 500 (see src/domain/ids.ts — Postgres rejects a malformed id
+// with 22P02 before this even gets to check for "unknown", so the shape is validated first).
 export async function findProductById(id: string): Promise<ProductRow | null> {
+  if (!isValidId(id)) return null;
+
   const [product] = await db
     .select({ id: products.id, name: products.name, categoryId: products.categoryId })
     .from(products)
@@ -63,6 +67,13 @@ export async function updateProductNameAndCategory(
   normalizedName: string,
   categoryId: string,
 ): Promise<ProductRow> {
+  if (!isValidId(id)) {
+    // The caller (editProduct) only reaches here with an id it just matched against the Products
+    // it read, so a malformed id is unreachable in practice; this guard keeps every by-id write
+    // behind the same shape check as the reads instead of trusting the caller.
+    throw new Error(`updateProductNameAndCategory called with a malformed id: ${JSON.stringify(id)}`);
+  }
+
   const [product] = await db
     .update(products)
     .set({ name, normalizedName, categoryId })
