@@ -71,6 +71,25 @@ describe("Per-IP lockout window", () => {
     expect(checkLockout(failures, IP_A, at(blockEnd))).toEqual({ status: "allowed" });
   });
 
+  // Guard: the window is inclusive at exactly 15 minutes (the AC's own wording, "within 15
+  // minutes"), distinct from the 14-minute case above and the 15-minutes-and-1ms case below.
+  it("blocks the IP when its 5 failures span exactly 15 minutes", () => {
+    const fifthAt = 15 * MIN;
+    const failures = [
+      { ip: IP_A, at: at(0) },
+      { ip: IP_A, at: at(3 * MIN) },
+      { ip: IP_A, at: at(6 * MIN) },
+      { ip: IP_A, at: at(9 * MIN) },
+      { ip: IP_A, at: at(fifthAt) },
+    ];
+
+    expect(checkLockout(failures, IP_A, at(fifthAt))).toEqual({
+      status: "blocked",
+      reason: "ip",
+      retryAt: at(fifthAt + 15 * MIN),
+    });
+  });
+
   it("is not blocked by 5 failures from a different IP", () => {
     const otherIp = "203.0.113.99";
     const failures = [
@@ -108,6 +127,26 @@ describe("Global sign-in pause window", () => {
       reason: "global",
       retryAt: at(30 * MIN + 60 * MIN),
     });
+  });
+
+  // Guard: the window is inclusive at exactly 60 minutes, and exclusive 1 ms past it, mirroring
+  // the per-IP 15-minute boundary tests above.
+  it("blocks everyone when the 31 failures span exactly 60 minutes", () => {
+    const thirtyFirstAt = 60 * MIN;
+    const failures = failuresAcrossManyIps(30, MIN).concat({ ip: "203.0.113.30", at: at(thirtyFirstAt) });
+
+    expect(checkLockout(failures, IP_A, at(thirtyFirstAt))).toEqual({
+      status: "blocked",
+      reason: "global",
+      retryAt: at(thirtyFirstAt + 60 * MIN),
+    });
+  });
+
+  it("allows sign-in when the 31 failures span 60 minutes and 1 millisecond", () => {
+    const thirtyFirstAt = 60 * MIN + 1;
+    const failures = failuresAcrossManyIps(30, MIN).concat({ ip: "203.0.113.30", at: at(thirtyFirstAt) });
+
+    expect(checkLockout(failures, IP_A, at(thirtyFirstAt))).toEqual({ status: "allowed" });
   });
 
   it("ends exactly 60 minutes after the 31st failure", () => {

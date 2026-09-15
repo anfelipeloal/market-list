@@ -41,32 +41,40 @@ function latestBlockEnd(sortedTimes: number[], threshold: number, windowMs: numb
   return latest;
 }
 
+// Applies one rule (IP or global) to its relevant failures and reports the instant sign-in
+// becomes possible again, or null if `now` is not currently blocked by this rule.
+function ruleStatus(
+  failures: FailedAttempt[],
+  threshold: number,
+  windowMs: number,
+  blockMs: number,
+  nowMs: number,
+): Date | null {
+  const sortedTimes = failures.map((failure) => failure.at.getTime()).sort((a, b) => a - b);
+  const blockEnd = latestBlockEnd(sortedTimes, threshold, windowMs, blockMs);
+  return blockEnd !== null && nowMs < blockEnd ? new Date(blockEnd) : null;
+}
+
 // Decides whether a sign-in attempt from `ip` is allowed at `now`, given the failed attempts
 // recorded recently enough to matter (the caller decides how far back to load; see
 // src/db/sign-in-attempts.ts). `recentFailures` need not be sorted or pre-filtered by IP.
 export function checkLockout(recentFailures: FailedAttempt[], ip: string, now: Date): LockoutStatus {
   const nowMs = now.getTime();
+  const ipFailures = recentFailures.filter((failure) => failure.ip === ip);
 
-  const ipTimes = recentFailures
-    .filter((failure) => failure.ip === ip)
-    .map((failure) => failure.at.getTime())
-    .sort((a, b) => a - b);
-  const ipBlockEnd = latestBlockEnd(ipTimes, IP_FAILURE_THRESHOLD, IP_WINDOW_MS, IP_BLOCK_MS);
-  const ipBlocked = ipBlockEnd !== null && nowMs < ipBlockEnd;
+  const active: Array<{ reason: "ip" | "global"; retryAt: Date }> = [];
 
-  const globalTimes = recentFailures.map((failure) => failure.at.getTime()).sort((a, b) => a - b);
-  const globalBlockEnd = latestBlockEnd(globalTimes, GLOBAL_FAILURE_THRESHOLD, GLOBAL_WINDOW_MS, GLOBAL_BLOCK_MS);
-  const globalBlocked = globalBlockEnd !== null && nowMs < globalBlockEnd;
+  const ipRetryAt = ruleStatus(ipFailures, IP_FAILURE_THRESHOLD, IP_WINDOW_MS, IP_BLOCK_MS, nowMs);
+  if (ipRetryAt) active.push({ reason: "ip", retryAt: ipRetryAt });
+
+  const globalRetryAt = ruleStatus(recentFailures, GLOBAL_FAILURE_THRESHOLD, GLOBAL_WINDOW_MS, GLOBAL_BLOCK_MS, nowMs);
+  if (globalRetryAt) active.push({ reason: "global", retryAt: globalRetryAt });
+
+  if (active.length === 0) return { status: "allowed" };
 
   // When both apply, report whichever ends later so the message never understates the wait.
-  if (ipBlocked && globalBlocked) {
-    return ipBlockEnd! >= globalBlockEnd!
-      ? { status: "blocked", reason: "ip", retryAt: new Date(ipBlockEnd!) }
-      : { status: "blocked", reason: "global", retryAt: new Date(globalBlockEnd!) };
-  }
-  if (ipBlocked) return { status: "blocked", reason: "ip", retryAt: new Date(ipBlockEnd!) };
-  if (globalBlocked) return { status: "blocked", reason: "global", retryAt: new Date(globalBlockEnd!) };
-  return { status: "allowed" };
+  const latest = active.reduce((later, candidate) => (candidate.retryAt > later.retryAt ? candidate : later));
+  return { status: "blocked", reason: latest.reason, retryAt: latest.retryAt };
 }
 
 // Turns a remaining wait into whole minutes, rounded up, for the sign-in message: someone with
