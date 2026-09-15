@@ -59,7 +59,14 @@ export async function createCategory(_prevState: CreateCategoryState, formData: 
   return undefined;
 }
 
-export type CreateProductState = { error: string } | undefined;
+export type CreateProductState =
+  | { kind: "error"; error: string }
+  // The existing Product is still in the Pantry: offers a one-tap move to the Shopping List (see
+  // src/app/(app)/product-form.tsx and CONTEXT.md's duplicate-create acceptance criterion).
+  | { kind: "duplicatePantry"; message: string; productId: string; productName: string }
+  // The existing Product is already on the Shopping List or In Cart: nothing to offer.
+  | { kind: "duplicateShoppingList"; message: string }
+  | undefined;
 
 export async function createProduct(_prevState: CreateProductState, formData: FormData): Promise<CreateProductState> {
   await requireUser();
@@ -70,15 +77,15 @@ export async function createProduct(_prevState: CreateProductState, formData: Fo
   const result = validateNewProduct(rawName, categoryId, existingProducts, existingCategories);
 
   if (result.outcome === "empty") {
-    return { error: "Escribe un nombre." };
+    return { kind: "error", error: "Escribe un nombre." };
   }
   if (result.outcome === "unknownCategory") {
     // Not one of the Spanish messages the ticket specifies: the Category comes from a <select>
     // populated with the real Categories, so this only fires if a request is tampered with.
-    return { error: "Elige una categoría." };
+    return { kind: "error", error: "Elige una categoría." };
   }
   if (result.outcome === "duplicate") {
-    return { error: `${result.existingProduct.name} ya existe en ${result.existingCategory.name}.` };
+    return duplicateProductState(result.existingProduct, result.existingCategory);
   }
 
   const outcome = await writeUniqueOrDuplicate({
@@ -86,11 +93,30 @@ export async function createProduct(_prevState: CreateProductState, formData: Fo
     findExisting: () => findProductWithCategoryByNormalizedName(result.normalizedName),
   });
   if (outcome.outcome === "duplicate") {
-    return { error: `${outcome.existing.product.name} ya existe en ${outcome.existing.category.name}.` };
+    return duplicateProductState(outcome.existing.product, outcome.existing.category);
   }
 
   revalidatePath("/");
+  revalidatePath("/lista");
   return undefined;
+}
+
+// Builds the create-Product duplicate state from the existing Product's status (see
+// src/domain/catalog/create-product.ts and CONTEXT.md): still in the Pantry offers the move,
+// already on the Shopping List or In Cart just says so.
+function duplicateProductState(
+  product: { id: string; name: string; status: "pantry" | "shopping_list" | "in_cart" },
+  category: { name: string },
+): CreateProductState {
+  if (product.status === "pantry") {
+    return {
+      kind: "duplicatePantry",
+      message: `${product.name} ya existe en ${category.name}.`,
+      productId: product.id,
+      productName: product.name,
+    };
+  }
+  return { kind: "duplicateShoppingList", message: `${product.name} ya está en la lista de compras.` };
 }
 
 export type EditCategoryState = { error: string } | undefined;
@@ -134,9 +160,9 @@ export async function editCategory(_prevState: EditCategoryState, formData: Form
 export type EditProductState = { error: string } | undefined;
 
 // Renames a Product and/or moves it to a different Category from the same form (see
-// src/app/productos/[id]/editar): one "Guardar" submit validates and applies both at once, which
-// is simpler for a User than two separate forms and avoids a rename succeeding while a move fails
-// (or vice versa) from the same screen.
+// src/app/(app)/productos/[id]/editar): one "Guardar" submit validates and applies both at once,
+// which is simpler for a User than two separate forms and avoids a rename succeeding while a
+// move fails (or vice versa) from the same screen.
 export async function editProduct(_prevState: EditProductState, formData: FormData): Promise<EditProductState> {
   await requireUser();
 
@@ -175,6 +201,9 @@ export async function editProduct(_prevState: EditProductState, formData: FormDa
     return { error: `${outcome.existing.product.name} ya existe en ${outcome.existing.category.name}.` };
   }
 
+  // A renamed or re-categorized Product may currently be on the Shopping List, so that screen is
+  // revalidated too, not just the Despensa.
   revalidatePath("/");
+  revalidatePath("/lista");
   redirect("/");
 }

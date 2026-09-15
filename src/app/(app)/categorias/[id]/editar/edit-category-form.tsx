@@ -1,7 +1,7 @@
 "use client";
 
-import { editCategory } from "@/app/actions";
-import { CreateNameForm } from "@/app/create-name-form";
+import { editCategory } from "@/app/(app)/actions";
+import { CreateNameForm } from "@/app/(app)/create-name-form";
 
 export function EditCategoryForm({ categoryId, currentName }: { categoryId: string; currentName: string }) {
   return (
