@@ -3,13 +3,15 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { isSessionValid, sessionExpiresAt } from "@/domain/access/session";
+import { SESSION_DURATION_MS, isSessionValid, sessionExpiresAt } from "@/domain/access/session";
 import { findSessionUser, insertSession } from "@/db/sessions";
 import type { SignedInUser } from "@/db/users";
 import { SESSION_COOKIE_NAME } from "./session-cookie";
 import { generateSessionToken, hashSessionToken } from "./session-token";
 
-const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+// The cookie's max-age must track the Session's actual lifetime, so it's derived from the same
+// domain constant that computes expiresAt rather than a second, independently maintained value.
+const SESSION_MAX_AGE_SECONDS = SESSION_DURATION_MS / 1000;
 
 // Creates a server-side Session for userId and sets the cookie that identifies it. Called once,
 // right after a PIN is verified.
