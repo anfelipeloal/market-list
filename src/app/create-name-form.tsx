@@ -14,6 +14,7 @@ export function CreateNameForm({
   label,
   labelVisible = false,
   placeholder,
+  defaultValue,
   submitLabel = "Agregar",
   formClassName,
   buttonClassName,
@@ -23,6 +24,9 @@ export function CreateNameForm({
   label: string;
   labelVisible?: boolean;
   placeholder?: string;
+  // Prefills the name input, e.g. with the current name on an edit form; a create form leaves it
+  // unset so the input starts empty.
+  defaultValue?: string;
   submitLabel?: string;
   formClassName: string;
   buttonClassName: string;
@@ -52,6 +56,7 @@ export function CreateNameForm({
           name="name"
           type="text"
           placeholder={placeholder}
+          defaultValue={defaultValue}
           required
           aria-describedby={state?.error ? errorId : undefined}
           className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-3 text-base"

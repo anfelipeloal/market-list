@@ -43,3 +43,30 @@ export async function findProductWithCategoryByNormalizedName(
     category: { id: row.categoryId, name: row.categoryName },
   };
 }
+
+// Preloads the Product being edited on the rename/move page; an unknown id renders a not-found
+// message rather than a 500.
+export async function findProductById(id: string): Promise<ProductRow | null> {
+  const [product] = await db
+    .select({ id: products.id, name: products.name, categoryId: products.categoryId })
+    .from(products)
+    .where(eq(products.id, id))
+    .limit(1);
+  return product ?? null;
+}
+
+// Renames a Product and/or moves it to a different Category in one write: the edit page's single
+// form submits both at once (see src/app/productos/[id]/editar).
+export async function updateProductNameAndCategory(
+  id: string,
+  name: string,
+  normalizedName: string,
+  categoryId: string,
+): Promise<ProductRow> {
+  const [product] = await db
+    .update(products)
+    .set({ name, normalizedName, categoryId })
+    .where(eq(products.id, id))
+    .returning({ id: products.id, name: products.name, categoryId: products.categoryId });
+  return product;
+}
