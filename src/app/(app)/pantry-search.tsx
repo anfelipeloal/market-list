@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useId, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CategoryForm } from "./category-form";
 import { PantryProductRow } from "./pantry-product-row";
@@ -11,7 +11,19 @@ import type { PantryCategory } from "@/domain/catalog/pantry";
 import { searchPantry } from "@/domain/catalog/search-pantry";
 
 const STALE_MESSAGE = "Este producto cambió. Actualiza la página.";
+const NOT_FOUND_MESSAGE = "No encontramos ese producto.";
 const UNDO_TIMEOUT_MS = 5000;
+
+// The toast's own id is derived from the Product's, so a second move/undo toast for the same
+// Product replaces the first instead of stacking, and so it can be dismissed by id (see
+// handleUndo below).
+function moveToastId(productId: string): string {
+  return `move-${productId}`;
+}
+
+function messageFor(outcome: "stale" | "notFound"): string {
+  return outcome === "notFound" ? NOT_FOUND_MESSAGE : STALE_MESSAGE;
+}
 
 // Owns the search text and filters the Pantry view on every keystroke, entirely in the browser:
 // the server already sent every Category and Product, so there is no round trip while typing.
@@ -28,6 +40,13 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   const [searchText, setSearchText] = useState("");
   const [hiddenProductIds, setHiddenProductIds] = useState<ReadonlySet<string>>(new Set());
   const inputId = useId();
+  // Tracks which Products already have an undo in flight, checked and set synchronously (a ref,
+  // not state) so a second "Deshacer" tap — dispatched as its own, separate click event even when
+  // it lands a moment after the first — sees the guard immediately rather than racing a
+  // re-render. Without this, double-tapping Deshacer sends returnToPantry twice: the first
+  // succeeds, and the second (now genuinely stale, since the Product is already back in the
+  // Pantry) surfaces the stale message right after a successful undo.
+  const undoInFlight = useRef<Set<string>>(new Set());
 
   const visiblePantry = useMemo(
     () =>
@@ -39,9 +58,16 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   );
 
   const handleUndo = useCallback(async (productId: string) => {
+    if (undoInFlight.current.has(productId)) return;
+    undoInFlight.current.add(productId);
+    // Dismissing immediately removes the Deshacer button itself, so a human can't tap it again
+    // either; the ref guard above covers any tap that still lands before this takes effect.
+    toast.dismiss(moveToastId(productId));
+
     const result = await returnToPantry(productId);
+    undoInFlight.current.delete(productId);
     if (result.outcome !== "ok") {
-      toast(STALE_MESSAGE);
+      toast(messageFor(result.outcome));
       return;
     }
     setHiddenProductIds((prev) => {
@@ -58,12 +84,13 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
     async (productId: string, productName: string): Promise<boolean> => {
       const result = await moveToShoppingList(productId);
       if (result.outcome !== "ok") {
-        toast(STALE_MESSAGE);
+        toast(messageFor(result.outcome));
         return false;
       }
 
       setHiddenProductIds((prev) => new Set(prev).add(productId));
       toast(`${productName} se agregó a la lista de compras.`, {
+        id: moveToastId(productId),
         duration: UNDO_TIMEOUT_MS,
         action: {
           label: "Deshacer",
