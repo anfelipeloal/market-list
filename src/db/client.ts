@@ -15,3 +15,9 @@ const sql = globalForDb.sql ?? postgres(url, { prepare: false });
 if (process.env.NODE_ENV !== "production") globalForDb.sql = sql;
 
 export const db = drizzle(sql, { schema });
+
+// The type of the transaction handle passed into a db.transaction() callback. Query modules that
+// need to run inside a caller-managed transaction (e.g. src/db/sign-in-attempts.ts) accept this
+// instead of importing `db` directly, so the same statements work whether or not they're wrapped
+// in a transaction.
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
