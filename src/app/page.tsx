@@ -1,10 +1,11 @@
-import { connection } from "next/server";
 import { listCategories } from "@/db/categories";
 import { sortByName } from "@/domain/catalog/names";
+import { requireUser } from "@/lib/session";
 
 export default async function PantryPage() {
-  // The Pantry changes at runtime, so it must be read per request, never prerendered at build.
-  await connection();
+  // requireUser() reads the session cookie, which makes this route dynamic: the Pantry always
+  // reflects the latest data instead of being prerendered at build.
+  await requireUser();
   const categories = sortByName(await listCategories());
 
   return (

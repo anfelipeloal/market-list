@@ -27,14 +27,19 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
    npm install
    ```
 
-2. Create `.env.local` at the repository root with the local database connection strings:
+2. Create `.env.local` at the repository root with the local database connection strings and the sign-in configuration:
 
    ```sh
    DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
    DIRECT_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+   PIN_HASH_SECRET=local-dev-only-pin-hash-secret-change-me
+   FIRST_ADMIN_NAME=Admin
+   FIRST_ADMIN_PIN=1234
    ```
 
    `DATABASE_URL` is used by the app at runtime; `DIRECT_DATABASE_URL` by migrations and seeding. In hosted environments `DATABASE_URL` points at Supabase's pooler in transaction mode (port 6543) and `DIRECT_DATABASE_URL` at the direct connection.
+
+   `PIN_HASH_SECRET` keys the HMAC-SHA256 used to hash every PIN before it is stored (ADR-0001); use a long random string in hosted environments. `FIRST_ADMIN_NAME` and `FIRST_ADMIN_PIN` configure the first Admin, created automatically the first time anyone signs in while the Household has no Users yet (no manual seed step). All three are server-only. `PIN_HASH_SECRET` is required and checked on every sign-in attempt; `FIRST_ADMIN_NAME` and `FIRST_ADMIN_PIN` are only read and validated while the Users table is still empty. Each fails fast with a clear error when it's needed but missing.
 
 3. Start the local Supabase stack (only Postgres is enabled; the first run downloads the image):
 
