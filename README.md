@@ -1,0 +1,77 @@
+# Mercado
+
+A phone-first grocery tracker for a single Household: a Pantry of Products grouped in Categories, and a shared Shopping List. The app's UI is in Spanish.
+
+- Domain language: [CONTEXT.md](CONTEXT.md)
+- Architecture decisions: [docs/adr/](docs/adr/)
+- Spec and tickets: GitHub issue #1 and its sub-issues
+
+## Stack
+
+Next.js (App Router, TypeScript) · Tailwind CSS + shadcn/ui · Drizzle ORM · Supabase Postgres · Vitest
+
+Business rules live in a pure domain core under `src/domain/` (no database, framework, clock or environment access) and are the only code with automated tests. The database layer lives in `src/db/` and is only ever used from the server.
+
+## Local development
+
+### Prerequisites
+
+- Node.js 24
+- Docker Desktop, running
+
+### First-time setup
+
+1. Install dependencies:
+
+   ```sh
+   npm install
+   ```
+
+2. Create `.env.local` at the repository root with the local database connection strings:
+
+   ```sh
+   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+   DIRECT_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+   ```
+
+   `DATABASE_URL` is used by the app at runtime; `DIRECT_DATABASE_URL` by migrations and seeding. In hosted environments `DATABASE_URL` points at Supabase's pooler in transaction mode (port 6543) and `DIRECT_DATABASE_URL` at the direct connection.
+
+3. Start the local Supabase stack (only Postgres is enabled; the first run downloads the image):
+
+   ```sh
+   npm run db:start
+   ```
+
+4. Apply migrations and seed the starting Categories:
+
+   ```sh
+   npm run db:migrate
+   npm run db:seed
+   ```
+
+   Seeding only inserts the starting Categories when the Household has none, so it is safe to run again.
+
+5. Start the app and open http://localhost:3000:
+
+   ```sh
+   npm run dev
+   ```
+
+### Everyday commands
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the app |
+| `npm test` | Run the unit tests once |
+| `npm run test:watch` | Run the unit tests in watch mode |
+| `npm run typecheck` | Type-check the project |
+| `npm run lint` | Lint the project |
+| `npm run db:generate -- --name <change>` | Generate a migration after changing `src/db/schema.ts` |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:seed` | Seed the starting Categories into an empty Household |
+| `npm run db:stop` | Stop the local Supabase stack |
+
+### Database rules
+
+- Every table enables Row Level Security with no policies, so Supabase's public key can read or write nothing. Only the Next.js server, with a privileged connection, touches data.
+- Schema changes go through Drizzle migrations in `drizzle/`; never edit the database by hand.
