@@ -22,6 +22,13 @@
       "when": 1789435940209,
       "tag": "0002_create_sign_in_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789437675989,
+      "tag": "0003_create_products",
+      "breakpoints": true
     }
   ]
 }
