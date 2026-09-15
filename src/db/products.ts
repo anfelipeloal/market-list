@@ -1,28 +1,34 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { isValidId } from "@/domain/ids";
+import { transitionRule, type ProductStatus, type ShoppingTransition } from "@/domain/shopping/status";
 import { db } from "./client";
 import { categories, products } from "./schema";
 
-export type ProductRow = { id: string; name: string; categoryId: string };
+export type ProductRow = { id: string; name: string; categoryId: string; status: ProductStatus };
+
+const PRODUCT_COLUMNS = {
+  id: products.id,
+  name: products.name,
+  categoryId: products.categoryId,
+  status: products.status,
+};
 
 export async function listProducts(): Promise<ProductRow[]> {
-  return db
-    .select({ id: products.id, name: products.name, categoryId: products.categoryId })
-    .from(products);
+  return db.select(PRODUCT_COLUMNS).from(products);
 }
 
+// New Products always start in the Pantry (the column's default), so the caller never passes a
+// status: nothing creates a Product directly on the Shopping List or In Cart.
 export async function insertProduct(name: string, normalizedName: string, categoryId: string): Promise<ProductRow> {
-  const [product] = await db
-    .insert(products)
-    .values({ name, normalizedName, categoryId })
-    .returning({ id: products.id, name: products.name, categoryId: products.categoryId });
+  const [product] = await db.insert(products).values({ name, normalizedName, categoryId }).returning(PRODUCT_COLUMNS);
   return product;
 }
 
 // Re-reads a Product and its Category by the Product's normalized name after a unique-constraint
-// race (see src/db/pg-errors.ts), to build the duplicate message from the row that actually won.
+// race (see src/db/pg-errors.ts), to build the duplicate message (with the existing Product's
+// status, see src/domain/catalog/create-product.ts) from the row that actually won.
 export async function findProductWithCategoryByNormalizedName(
   normalizedName: string,
 ): Promise<{ product: ProductRow; category: { id: string; name: string } } | null> {
@@ -31,6 +37,7 @@ export async function findProductWithCategoryByNormalizedName(
       productId: products.id,
       productName: products.name,
       categoryId: products.categoryId,
+      productStatus: products.status,
       categoryName: categories.name,
     })
     .from(products)
@@ -40,7 +47,7 @@ export async function findProductWithCategoryByNormalizedName(
 
   if (!row) return null;
   return {
-    product: { id: row.productId, name: row.productName, categoryId: row.categoryId },
+    product: { id: row.productId, name: row.productName, categoryId: row.categoryId, status: row.productStatus },
     category: { id: row.categoryId, name: row.categoryName },
   };
 }
@@ -51,16 +58,12 @@ export async function findProductWithCategoryByNormalizedName(
 export async function findProductById(id: string): Promise<ProductRow | null> {
   if (!isValidId(id)) return null;
 
-  const [product] = await db
-    .select({ id: products.id, name: products.name, categoryId: products.categoryId })
-    .from(products)
-    .where(eq(products.id, id))
-    .limit(1);
+  const [product] = await db.select(PRODUCT_COLUMNS).from(products).where(eq(products.id, id)).limit(1);
   return product ?? null;
 }
 
 // Renames a Product and/or moves it to a different Category in one write: the edit page's single
-// form submits both at once (see src/app/productos/[id]/editar).
+// form submits both at once (see src/app/(app)/productos/[id]/editar).
 export async function updateProductNameAndCategory(
   id: string,
   name: string,
@@ -78,6 +81,37 @@ export async function updateProductNameAndCategory(
     .update(products)
     .set({ name, normalizedName, categoryId })
     .where(eq(products.id, id))
-    .returning({ id: products.id, name: products.name, categoryId: products.categoryId });
+    .returning(PRODUCT_COLUMNS);
   return product;
+}
+
+export type ApplyProductTransitionResult =
+  | { outcome: "moved"; product: ProductRow }
+  | { outcome: "stale" }
+  | { outcome: "notFound" };
+
+// Performs a named Shopping transition (see src/domain/shopping/status.ts) as a single
+// conditional UPDATE: WHERE id = id AND status = <the transition's expected starting status>.
+// This is the race guard for status changes: if another request changed this Product's status
+// between the caller deciding to act and this UPDATE running, zero rows are affected and the
+// change is silently NOT applied, rather than clobbering whatever the other request set. The
+// conditional UPDATE is the atomic guard against that race; it alone can't tell "no such Product"
+// apart from "found, but not in the expected status", since both affect zero rows the same way.
+// A malformed id never matches a row either, so it short-circuits to "notFound" without a query.
+export async function applyProductTransition(id: string, transition: ShoppingTransition): Promise<ApplyProductTransitionResult> {
+  if (!isValidId(id)) return { outcome: "notFound" };
+
+  const { from, to } = transitionRule(transition);
+  const [product] = await db
+    .update(products)
+    .set({ status: to })
+    .where(and(eq(products.id, id), eq(products.status, from)))
+    .returning(PRODUCT_COLUMNS);
+
+  if (product) return { outcome: "moved", product };
+
+  // Zero rows affected: a follow-up read (outside the atomic guard, which has already done its
+  // job) tells apart the two possible reasons, so the caller can show the right message.
+  const [existing] = await db.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+  return existing ? { outcome: "stale" } : { outcome: "notFound" };
 }

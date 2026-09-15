@@ -20,7 +20,7 @@ describe("creating a Product", () => {
   });
 
   it("accepts a name that does not collide with any existing Product, in any Category", () => {
-    const existingProducts = [{ id: "prod-1", name: "Manzana", categoryId: "cat-frutas" }];
+    const existingProducts = [{ id: "prod-1", name: "Manzana", categoryId: "cat-frutas", status: "pantry" as const }];
 
     expect(validateNewProduct("Leche", "cat-lacteos", existingProducts, categories)).toEqual({
       outcome: "valid",
@@ -39,12 +39,32 @@ describe("creating a Product", () => {
     });
   });
 
-  it("rejects a name that collides with a Product in ANY Category under name matching, naming that Product and its Category", () => {
-    const existingProducts = [{ id: "prod-1", name: "Leche", categoryId: "cat-lacteos" }];
+  it("rejects a name that collides with a Pantry Product, naming that Product (with its status) and its Category, so the UI can offer to move it to the Shopping List", () => {
+    const existingProducts = [{ id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "pantry" as const }];
 
     expect(validateNewProduct("leche ", "cat-frutas", existingProducts, categories)).toEqual({
       outcome: "duplicate",
-      existingProduct: { id: "prod-1", name: "Leche", categoryId: "cat-lacteos" },
+      existingProduct: { id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "pantry" },
+      existingCategory: { id: "cat-lacteos", name: "Lácteos y huevos" },
+    });
+  });
+
+  it("rejects a name that collides with a Product already on the Shopping List, naming its status so the UI can say it is already there", () => {
+    const existingProducts = [{ id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "shopping_list" as const }];
+
+    expect(validateNewProduct("leche", "cat-frutas", existingProducts, categories)).toEqual({
+      outcome: "duplicate",
+      existingProduct: { id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "shopping_list" },
+      existingCategory: { id: "cat-lacteos", name: "Lácteos y huevos" },
+    });
+  });
+
+  it("rejects a name that collides with a Product In Cart, naming its status", () => {
+    const existingProducts = [{ id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "in_cart" as const }];
+
+    expect(validateNewProduct("leche", "cat-frutas", existingProducts, categories)).toEqual({
+      outcome: "duplicate",
+      existingProduct: { id: "prod-1", name: "Leche", categoryId: "cat-lacteos", status: "in_cart" },
       existingCategory: { id: "cat-lacteos", name: "Lácteos y huevos" },
     });
   });

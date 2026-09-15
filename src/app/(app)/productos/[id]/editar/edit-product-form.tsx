@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useId } from "react";
-import { editProduct } from "@/app/actions";
+import { editProduct } from "@/app/(app)/actions";
 
 // A single form ("Guardar") both renames the Product and moves it to the selected Categoría: see
 // src/app/actions.ts (editProduct) for why one submit covers both instead of two separate forms.
