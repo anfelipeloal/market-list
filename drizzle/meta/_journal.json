@@ -8,6 +8,13 @@
       "when": 1789387727033,
       "tag": "0000_create_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789434577781,
+      "tag": "0001_create_users_and_sessions",
+      "breakpoints": true
     }
   ]
 }
