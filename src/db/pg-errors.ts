@@ -13,3 +13,28 @@ const UNIQUE_VIOLATION = "23505";
 export function isUniqueViolation(error: unknown): boolean {
   return error instanceof postgres.PostgresError && error.code === UNIQUE_VIOLATION;
 }
+
+export type UniqueWriteResult<TWrite, TExisting> =
+  | { outcome: "written"; value: TWrite }
+  | { outcome: "duplicate"; existing: TExisting };
+
+// Shared shape for every create/edit action that inserts or updates a uniquely-named row: attempt
+// the write, and if it loses a race to a unique constraint, re-read the row that won so the
+// caller can build its duplicate message from it (see src/app/actions.ts, which used to repeat
+// this try/catch/re-read block once per action). If the constraint was violated but the
+// supposedly-winning row can't be found (the race guard's own edge case), the original error is
+// rethrown rather than swallowed.
+export async function writeUniqueOrDuplicate<TWrite, TExisting>(params: {
+  write: () => Promise<TWrite>;
+  findExisting: () => Promise<TExisting | null>;
+}): Promise<UniqueWriteResult<TWrite, TExisting>> {
+  try {
+    const value = await params.write();
+    return { outcome: "written", value };
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    const existing = await params.findExisting();
+    if (!existing) throw error;
+    return { outcome: "duplicate", existing };
+  }
+}

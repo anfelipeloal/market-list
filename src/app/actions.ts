@@ -8,7 +8,7 @@ import {
   listCategories,
   updateCategoryName,
 } from "@/db/categories";
-import { isUniqueViolation } from "@/db/pg-errors";
+import { writeUniqueOrDuplicate } from "@/db/pg-errors";
 import {
   findProductWithCategoryByNormalizedName,
   insertProduct,
@@ -40,16 +40,16 @@ export async function createCategory(_prevState: CreateCategoryState, formData: 
     return { error: `Ya existe la categoría ${result.existingCategory.name}.` };
   }
 
-  try {
-    await insertCategory(result.name, result.normalizedName);
-  } catch (error) {
-    // The domain check above already read the existing Categories, but a concurrent create could
-    // have won the same name since; the unique constraint is the final guard (see
-    // src/db/pg-errors.ts). Re-read the row that won to build the same duplicate message.
-    if (!isUniqueViolation(error)) throw error;
-    const existingCategory = await findCategoryByNormalizedName(result.normalizedName);
-    if (!existingCategory) throw error;
-    return { error: `Ya existe la categoría ${existingCategory.name}.` };
+  // The domain check above already read the existing Categories, but a concurrent create could
+  // have won the same name since; the unique constraint is the final guard (see
+  // src/db/pg-errors.ts). writeUniqueOrDuplicate re-reads the row that won to build the same
+  // duplicate message.
+  const outcome = await writeUniqueOrDuplicate({
+    write: () => insertCategory(result.name, result.normalizedName),
+    findExisting: () => findCategoryByNormalizedName(result.normalizedName),
+  });
+  if (outcome.outcome === "duplicate") {
+    return { error: `Ya existe la categoría ${outcome.existing.name}.` };
   }
 
   // The Despensa reads data via requireUser() + a plain select, with no explicit caching, but the
@@ -81,13 +81,12 @@ export async function createProduct(_prevState: CreateProductState, formData: Fo
     return { error: `${result.existingProduct.name} ya existe en ${result.existingCategory.name}.` };
   }
 
-  try {
-    await insertProduct(result.name, result.normalizedName, result.categoryId);
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    const existing = await findProductWithCategoryByNormalizedName(result.normalizedName);
-    if (!existing) throw error;
-    return { error: `${existing.product.name} ya existe en ${existing.category.name}.` };
+  const outcome = await writeUniqueOrDuplicate({
+    write: () => insertProduct(result.name, result.normalizedName, result.categoryId),
+    findExisting: () => findProductWithCategoryByNormalizedName(result.normalizedName),
+  });
+  if (outcome.outcome === "duplicate") {
+    return { error: `${outcome.existing.product.name} ya existe en ${outcome.existing.category.name}.` };
   }
 
   revalidatePath("/");
@@ -118,15 +117,14 @@ export async function editCategory(_prevState: EditCategoryState, formData: Form
     return { error: `Ya existe la categoría ${result.existingCategory.name}.` };
   }
 
-  try {
-    await updateCategoryName(result.id, result.name, result.normalizedName);
-  } catch (error) {
-    // Same race guard as createCategory: a concurrent rename could have won the same name since
-    // the domain check read the existing Categories.
-    if (!isUniqueViolation(error)) throw error;
-    const existingCategory = await findCategoryByNormalizedName(result.normalizedName);
-    if (!existingCategory) throw error;
-    return { error: `Ya existe la categoría ${existingCategory.name}.` };
+  // Same race guard as createCategory: a concurrent rename could have won the same name since the
+  // domain check read the existing Categories.
+  const outcome = await writeUniqueOrDuplicate({
+    write: () => updateCategoryName(result.id, result.name, result.normalizedName),
+    findExisting: () => findCategoryByNormalizedName(result.normalizedName),
+  });
+  if (outcome.outcome === "duplicate") {
+    return { error: `Ya existe la categoría ${outcome.existing.name}.` };
   }
 
   revalidatePath("/");
@@ -168,13 +166,13 @@ export async function editProduct(_prevState: EditProductState, formData: FormDa
     return { error: "Elige una categoría." };
   }
 
-  try {
-    await updateProductNameAndCategory(renameResult.id, renameResult.name, renameResult.normalizedName, moveResult.categoryId);
-  } catch (error) {
-    if (!isUniqueViolation(error)) throw error;
-    const existing = await findProductWithCategoryByNormalizedName(renameResult.normalizedName);
-    if (!existing) throw error;
-    return { error: `${existing.product.name} ya existe en ${existing.category.name}.` };
+  const outcome = await writeUniqueOrDuplicate({
+    write: () =>
+      updateProductNameAndCategory(renameResult.id, renameResult.name, renameResult.normalizedName, moveResult.categoryId),
+    findExisting: () => findProductWithCategoryByNormalizedName(renameResult.normalizedName),
+  });
+  if (outcome.outcome === "duplicate") {
+    return { error: `${outcome.existing.product.name} ya existe en ${outcome.existing.category.name}.` };
   }
 
   revalidatePath("/");
