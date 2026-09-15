@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CategoryForm } from "./category-form";
 import { listCategories } from "@/db/categories";
 import { listProducts } from "@/db/products";
@@ -22,13 +23,21 @@ export default async function PantryPage() {
         <ul className="mt-4 flex flex-col gap-4">
           {pantry.map((category) => (
             <li key={category.id} className="overflow-hidden rounded-xl border bg-card">
-              <h2 className="border-b px-4 py-3 text-lg font-semibold">{category.name}</h2>
+              <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+                <h2 className="text-lg font-semibold">{category.name}</h2>
+                <Link href={`/categorias/${category.id}/editar`} className="text-sm text-muted-foreground underline">
+                  Editar
+                </Link>
+              </div>
 
               {category.products.length > 0 ? (
                 <ul className="divide-y">
                   {category.products.map((product) => (
-                    <li key={product.id} className="px-4 py-3 text-base">
-                      {product.name}
+                    <li key={product.id} className="flex items-center justify-between gap-2 px-4 py-3 text-base">
+                      <span>{product.name}</span>
+                      <Link href={`/productos/${product.id}/editar`} className="text-sm text-muted-foreground underline">
+                        Editar
+                      </Link>
                     </li>
                   ))}
                 </ul>

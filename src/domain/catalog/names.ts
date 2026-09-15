@@ -14,6 +14,18 @@ export function namesMatch(a: string, b: string): boolean {
   return normalizeName(a) === normalizeName(b);
 }
 
+// Finds the entry, other than the one being renamed (identified by `id`), whose name matches
+// `name`. Renaming an entry to a variant of its own name (e.g. fixing capitalization or an
+// accent) must not be reported as a collision with itself, so callers exclude `id` rather than
+// filtering by name alone.
+export function findOtherWithMatchingName<T extends { id: string; name: string }>(
+  items: readonly T[],
+  id: string,
+  name: string,
+): T | undefined {
+  return items.find((item) => item.id !== id && namesMatch(item.name, name));
+}
+
 // Explicit locale: the server's default (e.g. en-US on Vercel) would sort ñ as an accented n.
 const SPANISH = new Intl.Collator("es", { sensitivity: "base" });
 

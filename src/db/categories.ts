@@ -28,3 +28,23 @@ export async function findCategoryByNormalizedName(normalizedName: string): Prom
     .limit(1);
   return category ?? null;
 }
+
+// Preloads the Category being edited on the rename page; an unknown id renders a not-found
+// message rather than a 500.
+export async function findCategoryById(id: string): Promise<CategoryRow | null> {
+  const [category] = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.id, id))
+    .limit(1);
+  return category ?? null;
+}
+
+export async function updateCategoryName(id: string, name: string, normalizedName: string): Promise<CategoryRow> {
+  const [category] = await db
+    .update(categories)
+    .set({ name, normalizedName })
+    .where(eq(categories.id, id))
+    .returning({ id: categories.id, name: categories.name });
+  return category;
+}
