@@ -1,7 +1,13 @@
 const COMBINING_MARKS = /\p{Mn}/gu;
 
+// The form a Category or Product name is stored in for display: trimmed and with internal
+// whitespace collapsed, but capitalization and accents kept exactly as typed.
+export function cleanDisplayName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
 export function normalizeName(name: string): string {
-  return stripAccents(name.trim().replace(/\s+/g, " ").toLowerCase());
+  return stripAccents(cleanDisplayName(name).toLowerCase());
 }
 
 export function namesMatch(a: string, b: string): boolean {
