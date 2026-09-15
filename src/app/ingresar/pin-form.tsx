@@ -14,10 +14,10 @@ export function PinForm() {
       <input
         id="pin"
         name="pin"
-        type="text"
+        type="password"
         inputMode="numeric"
         pattern="[0-9]*"
-        autoComplete="one-time-code"
+        autoComplete="off"
         maxLength={4}
         required
         autoFocus
