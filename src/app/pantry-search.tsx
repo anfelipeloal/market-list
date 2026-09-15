@@ -17,6 +17,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   const trimmedSearch = searchText.trim();
   const isSearching = trimmedSearch.length > 0;
   const filtered = useMemo(() => searchPantry(pantry, searchText), [pantry, searchText]);
+  const matchCount = filtered.reduce((count, category) => count + category.products.length, 0);
 
   return (
     <>
@@ -32,6 +33,10 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
           placeholder="Buscar en la despensa"
           className="w-full rounded-lg border bg-background px-3 py-3 text-base"
         />
+        {/* Announces result changes to screen readers, which don't notice the list re-rendering. */}
+        <p aria-live="polite" className="sr-only">
+          {isSearching ? (matchCount === 1 ? "1 producto encontrado" : `${matchCount} productos encontrados`) : ""}
+        </p>
       </div>
 
       {pantry.length === 0 ? (
