@@ -15,6 +15,13 @@
       "when": 1789434577781,
       "tag": "0001_create_users_and_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789435940209,
+      "tag": "0002_create_sign_in_attempts",
+      "breakpoints": true
     }
   ]
 }
