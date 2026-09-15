@@ -33,3 +33,16 @@ export const sessions = pgTable("sessions", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
+
+// Every sign-in attempt whose PIN was actually evaluated, win or lose: the lockout rules in
+// src/domain/access/lockout.ts read recent rows here to decide whether to allow the next
+// attempt. Attempts rejected because of an existing block or pause are never evaluated and so
+// are never inserted (see src/app/ingresar/actions.ts), otherwise a blocked IP could never
+// recover. Rows older than 24 hours are opportunistically deleted whenever a new one is
+// recorded (src/db/sign-in-attempts.ts), since nothing older ever matters to either rule.
+export const signInAttempts = pgTable("sign_in_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ip: text("ip").notNull(),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  succeeded: boolean("succeeded").notNull(),
+}).enableRLS();
