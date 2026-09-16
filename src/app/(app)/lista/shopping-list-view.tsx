@@ -2,10 +2,21 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { finishTrip, toggleInCart, undoFinishTrip } from "../shopping-actions";
+import { finishTrip, resetShoppingList, toggleInCart, undoFinishTrip } from "../shopping-actions";
 import { shoppingResultMessage } from "../shopping-messages";
 import { buildShoppingListView, type ShoppingListCategory } from "@/domain/shopping/shopping-list";
 import { buildShoppingListMarkdown } from "@/domain/shopping/shopping-list-markdown";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ShoppingListProductRow } from "./shopping-list-product-row";
 
 const FINISH_TRIP_EMPTY_MESSAGE = "No hay productos en el carrito.";
@@ -17,6 +28,19 @@ const UNDO_TIMEOUT_MS = 5000;
 const COPY_SUCCESS_MESSAGE = "Lista copiada.";
 const COPY_FAILURE_MESSAGE = "No pudimos copiar la lista.";
 const COPY_EMPTY_MESSAGE = "No hay nada para copiar.";
+
+const RESET_EMPTY_MESSAGE = "La lista de compras ya estaba vacía.";
+const RESET_FORBIDDEN_MESSAGE = "Solo un administrador puede reiniciar la lista.";
+const RESET_TOAST_ID = "reset-shopping-list";
+
+// Reset (ticket #12) never offers undo (see CONTEXT.md), so its success message just reports how
+// many Products moved, unlike finishTripMessage below which also names the destination screen
+// implicitly through "Compra terminada".
+function resetMessage(count: number): string {
+  return count === 1
+    ? "La lista de compras se reinició. 1 producto volvió a la despensa."
+    : `La lista de compras se reinició. ${count} productos volvieron a la despensa.`;
+}
 
 // Puts text on the clipboard, reporting success rather than assuming it (ticket #11): the
 // Clipboard API can be missing (insecure context, older browser) or reject (no permission,
@@ -52,10 +76,21 @@ function finishTripMessage(count: number): string {
 // buildShoppingListView, the same domain function src/app/(app)/lista/page.tsx calls for the
 // initial server render — so the ordering rule has exactly one home instead of being
 // reimplemented here.
-export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListCategory[] }) {
+export function ShoppingListView({
+  shoppingList,
+  isAdmin,
+}: {
+  shoppingList: ShoppingListCategory[];
+  isAdmin: boolean;
+}) {
   const [inCartOverrides, setInCartOverrides] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [hiddenProductIds, setHiddenProductIds] = useState<ReadonlySet<string>>(new Set());
   const [isFinishingTrip, startFinishTripTransition] = useTransition();
+  // "Reiniciar lista" (ticket #12) has its own pending flag: it disables its own button (and
+  // closes its confirmation dialog) independently of Terminar compra, so a User can never trigger
+  // both at once through either button.
+  const [isResettingList, startResetTransition] = useTransition();
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
   // Guards "Deshacer" on the Finish Trip toast exactly like the per-Product undo in
   // pantry-search.tsx: a ref, not state, so a double tap is caught synchronously instead of
   // racing a re-render. There is at most one Finish Trip toast at a time, so a single boolean is
@@ -169,6 +204,37 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
     });
   }, [handleUndoFinishTrip]);
 
+  // Reiniciar lista (ticket #12, Admin-only): confirmed via the AlertDialog below rather than an
+  // undo notification, since Reset has no undo (see CONTEXT.md). resetShoppingList() enforces the
+  // Admin check server-side regardless of what isAdmin renders here (see shopping-actions.ts);
+  // "forbidden" is only reachable in practice through a tampered/replayed request, since a
+  // non-Admin never sees the button that opens this dialog. Closes the dialog itself on every
+  // outcome — success, empty, or forbidden — so a second tap can't stack another request while one
+  // is in flight (isResettingList's disabled state on both the trigger and the confirm button
+  // covers the rest).
+  const handleResetShoppingList = useCallback(() => {
+    startResetTransition(async () => {
+      const result = await resetShoppingList();
+      setResetDialogOpen(false);
+
+      if (result.outcome === "forbidden") {
+        toast(RESET_FORBIDDEN_MESSAGE, { id: RESET_TOAST_ID });
+        return;
+      }
+      // Both outcomes end with an empty Shopping List, so hide what is on screen either way:
+      // "empty" means someone else already reset it and this screen is showing stale Products.
+      const allProductIds = shoppingList.flatMap((category) => category.products.map((product) => product.id));
+      setHiddenProductIds((prev) => new Set([...prev, ...allProductIds]));
+
+      if (result.outcome === "empty") {
+        toast(RESET_EMPTY_MESSAGE, { id: RESET_TOAST_ID });
+        return;
+      }
+
+      toast(resetMessage(result.count), { id: RESET_TOAST_ID });
+    });
+  }, [shoppingList]);
+
   return (
     <>
       {visibleShoppingList.length === 0 ? (
@@ -213,6 +279,41 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
         >
           Terminar compra
         </button>
+
+        {/* Admin-only (ticket #12): hiding this from a non-Admin is only a courtesy — the real
+            enforcement is resetShoppingList()'s requireAdmin() check on the server (see
+            shopping-actions.ts). Styled as an outline button in the destructive color so it reads
+            as clearly different from Terminar compra's primary fill and from Copiar lista's
+            neutral outline, without the alarm of a solid destructive fill: Reset is guarded by the
+            confirmation dialog below, not by looking dangerous. */}
+        {isAdmin && (
+          <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+            <AlertDialogTrigger
+              disabled={isResettingList}
+              className="w-full rounded-lg border border-destructive/40 px-4 py-3 text-base font-semibold text-destructive disabled:opacity-50"
+            >
+              Reiniciar lista
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Todos los productos de la lista de compras volverán a la despensa. Ningún producto se elimina.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isResettingList}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  variant="destructive"
+                  disabled={isResettingList}
+                  onClick={handleResetShoppingList}
+                >
+                  Reiniciar lista
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </>
   );

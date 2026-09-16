@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { transitionRule } from "./status";
+import { RESET_TRANSITION, transitionRule } from "./status";
 
 // transitionRule is the single source of truth every Shopping transition is defined against (see
 // src/db/products.ts#applyProductTransition, which turns the pair it returns into the WHERE
@@ -40,5 +40,11 @@ describe("Finish Trip", () => {
 describe("undoing Finish Trip", () => {
   it("is the exact inverse of Finish Trip: Pantry back to In Cart", () => {
     expect(transitionRule("undoFinishTrip")).toEqual({ from: "pantry", to: "in_cart" });
+  });
+});
+
+describe("Reset", () => {
+  it("returns every Product on the Shopping List, In Cart or not, to the Pantry", () => {
+    expect(RESET_TRANSITION).toEqual({ from: ["shopping_list", "in_cart"], to: "pantry" });
   });
 });

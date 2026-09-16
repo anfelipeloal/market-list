@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, inArray, TransactionRollbackError } from "drizzle-orm";
 import { dedupeValidIds, isValidId } from "@/domain/ids";
 import { decideUndoFinishTrip } from "@/domain/shopping/finish-trip";
-import { transitionRule, type ProductStatus, type ShoppingTransition } from "@/domain/shopping/status";
+import { RESET_TRANSITION, transitionRule, type ProductStatus, type ShoppingTransition } from "@/domain/shopping/status";
 import { db } from "./client";
 import { categories, products } from "./schema";
 
@@ -155,6 +155,25 @@ export async function finishTrip(): Promise<string[]> {
     .update(products)
     .set({ status: to })
     .where(eq(products.status, from))
+    .returning({ id: products.id });
+  return rows.map((row) => row.id);
+}
+
+// Reset (ticket #12, Admin-only — enforced by src/lib/session.ts#requireAdmin before this is ever
+// called): returns every Product on the Shopping List, whether In Cart or not, to the Pantry in a
+// single atomic UPDATE ... WHERE status IN (...) statement (atomic on its own, like finishTrip
+// above; a single statement needs no explicit transaction). Reads its affected statuses and
+// destination from RESET_TRANSITION (src/domain/shopping/status.ts), the same table finishTrip's
+// own (from, to) pair comes from, rather than repeating the status literals here. Never deletes
+// Products or Categories, and there is no undo (see CONTEXT.md) — Reset is guarded by a
+// confirmation dialog in the UI instead of an undo notification. Returns the ids actually
+// affected, purely so the caller can report how many Products moved; nothing here restores them.
+export async function resetShoppingList(): Promise<string[]> {
+  const { from, to } = RESET_TRANSITION;
+  const rows = await db
+    .update(products)
+    .set({ status: to })
+    .where(inArray(products.status, from))
     .returning({ id: products.id });
   return rows.map((row) => row.id);
 }
