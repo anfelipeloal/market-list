@@ -8,11 +8,18 @@ const TABS = [
   { href: "/lista", label: "Lista de compras" },
 ] as const;
 
+// Admin-only (ticket #13): appended to TABS only for an Admin. Hiding it from a non-Admin is only
+// a courtesy — the real enforcement is requireAdmin() on /usuarios itself and on every action it
+// calls (see src/app/(app)/usuarios/page.tsx and actions.ts), exactly like Reiniciar lista's
+// button in ticket #12.
+const ADMIN_TAB = { href: "/usuarios", label: "Usuarios" } as const;
+
 // Fixed to the bottom of every signed-in screen (see src/app/(app)/layout.tsx), so a User can
-// always reach either the Despensa or the Lista de compras in one tap. Not shown on /ingresar,
-// which has no shared layout with the signed-in pages.
-export function BottomNav() {
+// always reach the Despensa, the Lista de compras, and (for an Admin) Usuarios in one tap. Not
+// shown on /ingresar, which has no shared layout with the signed-in pages.
+export function BottomNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const tabs = isAdmin ? [...TABS, ADMIN_TAB] : TABS;
 
   return (
     <nav
@@ -21,7 +28,7 @@ export function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto flex w-full max-w-md">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = pathname === tab.href;
           return (
             <li key={tab.href} className="flex-1">
