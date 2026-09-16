@@ -18,3 +18,27 @@ describe("returning a Product to the Pantry (the undo of moving it to the Shoppi
     expect(transitionRule("returnToPantry")).toEqual({ from: "shopping_list", to: "pantry" });
   });
 });
+
+describe("marking a Product In Cart", () => {
+  it("is allowed only from the Shopping List", () => {
+    expect(transitionRule("markInCart")).toEqual({ from: "shopping_list", to: "in_cart" });
+  });
+});
+
+describe("marking a Product still needed (the undo of marking it In Cart)", () => {
+  it("is allowed only from In Cart", () => {
+    expect(transitionRule("unmarkInCart")).toEqual({ from: "in_cart", to: "shopping_list" });
+  });
+});
+
+describe("Finish Trip", () => {
+  it("returns every In Cart Product to the Pantry", () => {
+    expect(transitionRule("finishTrip")).toEqual({ from: "in_cart", to: "pantry" });
+  });
+});
+
+describe("undoing Finish Trip", () => {
+  it("is the exact inverse of Finish Trip: Pantry back to In Cart", () => {
+    expect(transitionRule("undoFinishTrip")).toEqual({ from: "pantry", to: "in_cart" });
+  });
+});
