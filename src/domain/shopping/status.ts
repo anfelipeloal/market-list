@@ -54,3 +54,16 @@ const TRANSITIONS: Record<ShoppingTransition, TransitionRule> = {
 export function transitionRule(transition: ShoppingTransition): TransitionRule {
   return TRANSITIONS[transition];
 }
+
+// Reset (ticket #12, Admin-only — see src/lib/session.ts#requireAdmin): returns every Product on
+// the Shopping List, whether In Cart or not, to the Pantry at once. Unlike every transition in
+// TRANSITIONS above, Reset's starting point is two statuses rather than one, so it doesn't fit
+// TransitionRule's single `from`; this is Reset's own entry in the same table (the single source
+// of truth for which statuses a Shopping change touches). src/db/products.ts#resetShoppingList
+// reads it to build the `WHERE status IN (...)` of its own atomic UPDATE, and
+// src/domain/shopping/reset.ts#resetAffectedIds — the pure, unit-tested decision — reads it to
+// decide which Products Reset affects, so neither repeats these status literals.
+export const RESET_TRANSITION: { from: readonly ProductStatus[]; to: ProductStatus } = {
+  from: ["shopping_list", "in_cart"],
+  to: "pantry",
+};
