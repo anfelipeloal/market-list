@@ -221,13 +221,16 @@ export function ShoppingListView({
         toast(RESET_FORBIDDEN_MESSAGE, { id: RESET_TOAST_ID });
         return;
       }
+      // Both outcomes end with an empty Shopping List, so hide what is on screen either way:
+      // "empty" means someone else already reset it and this screen is showing stale Products.
+      const allProductIds = shoppingList.flatMap((category) => category.products.map((product) => product.id));
+      setHiddenProductIds((prev) => new Set([...prev, ...allProductIds]));
+
       if (result.outcome === "empty") {
         toast(RESET_EMPTY_MESSAGE, { id: RESET_TOAST_ID });
         return;
       }
 
-      const allProductIds = shoppingList.flatMap((category) => category.products.map((product) => product.id));
-      setHiddenProductIds((prev) => new Set([...prev, ...allProductIds]));
       toast(resetMessage(result.count), { id: RESET_TOAST_ID });
     });
   }, [shoppingList]);
