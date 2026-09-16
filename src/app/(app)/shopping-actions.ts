@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import {
   applyProductTransition,
   finishTrip as finishTripInDb,
+  resetShoppingList as resetShoppingListInDb,
   toggleProductInCart,
   undoFinishTrip as undoFinishTripInDb,
   type ApplyProductTransitionResult,
 } from "@/db/products";
-import { requireUser } from "@/lib/session";
+import { requireAdmin, requireUser } from "@/lib/session";
 
 export type ShoppingActionResult = { outcome: "ok" } | { outcome: "stale" } | { outcome: "notFound" };
 
@@ -74,4 +75,30 @@ export async function undoFinishTrip(productIds: string[]): Promise<UndoFinishTr
   revalidatePath("/");
   revalidatePath("/lista");
   return result;
+}
+
+export type ResetShoppingListResult =
+  | { outcome: "ok"; count: number }
+  | { outcome: "empty" }
+  | { outcome: "forbidden" };
+
+// Reset (ticket #12): the first Admin-only action in the app. requireAdmin() is the actual
+// enforcement — resolving the acting User server-side and refusing a non-Admin with a typed
+// result — before anything is read or written; the "Reiniciar lista" button in
+// src/app/(app)/lista/shopping-list-view.tsx only hides itself from a non-Admin as a courtesy, so
+// a non-Admin session invoking this action directly (bypassing the UI) still gets refused here.
+// When nothing is on the Shopping List, nothing changes and the caller shows "La lista de compras
+// ya estaba vacía." instead of a success message with nothing moved. Unlike Finish Trip there is
+// no undo (see CONTEXT.md): the confirmation dialog is Reset's only guard, so this never returns
+// affected ids for an undo notification, only the count for the success message.
+export async function resetShoppingList(): Promise<ResetShoppingListResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+
+  const affectedIds = await resetShoppingListInDb();
+  if (affectedIds.length === 0) return { outcome: "empty" };
+
+  revalidatePath("/");
+  revalidatePath("/lista");
+  return { outcome: "ok", count: affectedIds.length };
 }
