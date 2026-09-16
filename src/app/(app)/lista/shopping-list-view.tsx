@@ -3,20 +3,14 @@
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { finishTrip, toggleInCart, undoFinishTrip } from "../shopping-actions";
-import { sortByName } from "@/domain/catalog/names";
-import type { ShoppingListCategory } from "@/domain/shopping/shopping-list";
+import { shoppingResultMessage } from "../shopping-messages";
+import { buildShoppingListView, type ShoppingListCategory } from "@/domain/shopping/shopping-list";
 import { ShoppingListProductRow } from "./shopping-list-product-row";
 
-const TOGGLE_STALE_MESSAGE = "Este producto cambió. Actualiza la página.";
-const TOGGLE_NOT_FOUND_MESSAGE = "No encontramos ese producto.";
 const FINISH_TRIP_EMPTY_MESSAGE = "No hay productos en el carrito.";
 const FINISH_TRIP_STALE_MESSAGE = "La lista cambió. Actualiza la página.";
 const FINISH_TRIP_TOAST_ID = "finish-trip";
 const UNDO_TIMEOUT_MS = 5000;
-
-function toggleMessageFor(outcome: "stale" | "notFound"): string {
-  return outcome === "notFound" ? TOGGLE_NOT_FOUND_MESSAGE : TOGGLE_STALE_MESSAGE;
-}
 
 function finishTripMessage(count: number): string {
   return count === 1
@@ -35,8 +29,10 @@ function finishTripMessage(count: number): string {
 // - hiddenProductIds removes Products that Finish Trip just returned to the Pantry; undoing
 //   Finish Trip un-hides them and marks them In Cart again via inCartOverrides.
 // Re-deriving the displayed order (still-needed A-Z, then In Cart A-Z, ticket #10) from these
-// layers on every render keeps the split correct after a toggle without duplicating the ordering
-// rule: it reuses the same Spanish-locale sortByName the server-side domain core uses.
+// layers on every render re-runs the flattened Categories and Products back through
+// buildShoppingListView, the same domain function src/app/(app)/lista/page.tsx calls for the
+// initial server render — so the ordering rule has exactly one home instead of being
+// reimplemented here.
 export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListCategory[] }) {
   const [inCartOverrides, setInCartOverrides] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [hiddenProductIds, setHiddenProductIds] = useState<ReadonlySet<string>>(new Set());
@@ -48,17 +44,21 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
   const undoInFlight = useRef(false);
 
   const visibleShoppingList = useMemo(() => {
-    return shoppingList
-      .map((category) => {
-        const products = category.products
-          .filter((product) => !hiddenProductIds.has(product.id))
-          .map((product) => ({ ...product, inCart: inCartOverrides.get(product.id) ?? product.inCart }));
-        const needed = sortByName(products.filter((product) => !product.inCart));
-        const inCart = sortByName(products.filter((product) => product.inCart));
+    const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
+    const products = shoppingList.flatMap((category) =>
+      category.products
+        .filter((product) => !hiddenProductIds.has(product.id))
+        .map((product) => ({
+          id: product.id,
+          name: product.name,
+          categoryId: category.id,
+          status: (inCartOverrides.get(product.id) ?? product.inCart)
+            ? ("in_cart" as const)
+            : ("shopping_list" as const),
+        })),
+    );
 
-        return { ...category, products: [...needed, ...inCart] };
-      })
-      .filter((category) => category.products.length > 0);
+    return buildShoppingListView(categories, products);
   }, [shoppingList, hiddenProductIds, inCartOverrides]);
 
   const hasInCart = visibleShoppingList.some((category) => category.products.some((product) => product.inCart));
@@ -66,7 +66,7 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
   const handleToggle = useCallback(async (productId: string, currentlyInCart: boolean) => {
     const result = await toggleInCart(productId);
     if (result.outcome !== "ok") {
-      toast(toggleMessageFor(result.outcome));
+      toast(shoppingResultMessage(result.outcome));
       return;
     }
     setInCartOverrides((prev) => new Map(prev).set(productId, !currentlyInCart));
