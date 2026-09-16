@@ -9,3 +9,14 @@ const ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 export function isValidId(id: string): boolean {
   return ID_PATTERN.test(id);
 }
+
+// Cleans a list of ids that arrived from outside the domain core (e.g. a server action's
+// argument, ultimately from the browser), before anything looks them up or counts them: drops
+// anything that isn't a validly shaped id and collapses duplicates. Used wherever a caller must
+// reason about "how many distinct ids were requested" — e.g.
+// src/domain/shopping/finish-trip.ts#decideUndoFinishTrip and its caller
+// src/db/products.ts#undoFinishTrip — so a malformed or repeated id can never inflate or corrupt
+// that count.
+export function dedupeValidIds(ids: readonly string[]): string[] {
+  return [...new Set(ids.filter(isValidId))];
+}

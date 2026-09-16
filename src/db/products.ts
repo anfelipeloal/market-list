@@ -1,7 +1,8 @@
 import "server-only";
 
 import { and, eq, inArray, TransactionRollbackError } from "drizzle-orm";
-import { isValidId } from "@/domain/ids";
+import { dedupeValidIds, isValidId } from "@/domain/ids";
+import { decideUndoFinishTrip } from "@/domain/shopping/finish-trip";
 import { transitionRule, type ProductStatus, type ShoppingTransition } from "@/domain/shopping/status";
 import { db } from "./client";
 import { categories, products } from "./schema";
@@ -161,22 +162,25 @@ export async function finishTrip(): Promise<string[]> {
 export type UndoFinishTripResult = { outcome: "ok" } | { outcome: "stale" };
 
 // Undo of Finish Trip (ticket #10): puts exactly the Products Finish Trip just returned to the
-// Pantry back In Cart, all-or-nothing. Every id is validated the same way a single-Product id is
-// elsewhere (isValidId), since these ids arrive from the browser via a server action rather than
-// from a query this module trusts; a malformed one is simply dropped rather than reaching
-// Postgres, which would otherwise reject the whole statement with 22P02. An empty list (every id
-// malformed, or none passed) is a no-op.
+// Pantry back In Cart, all-or-nothing. dedupeValidIds cleans the ids first (they arrive from the
+// browser via a server action rather than from a query this module trusts): a malformed one is
+// dropped rather than reaching Postgres, which would otherwise reject the whole statement with
+// 22P02, and a duplicate never counts twice. An empty result is a no-op.
 //
 // The conditional UPDATE (WHERE id IN (...) AND status = 'pantry') is the same atomic guard as
 // applyProductTransition's, just widened to many ids at once: if a Product among them was changed
 // by someone else in the meantime (e.g. moved back onto the Shopping List directly), it won't
-// match and the row count returned will be short. Because this must be all-or-nothing rather than
-// "restore whichever ones still match", a short count rolls back the whole transaction via
-// tx.rollback() (which rejects db.transaction()'s promise with TransactionRollbackError) instead
-// of leaving a partial restore in place.
+// match. Whether that's enough to proceed is decideUndoFinishTrip's call (the pure, unit-tested
+// half of this decision, see src/domain/shopping/finish-trip.ts) — it gets a minimal {id, status}
+// view built from what this UPDATE's own RETURNING already determined (a returned id was `from`
+// a moment ago; any other requested id provably was not, or the WHERE clause would have matched
+// it), so no separate read is added just to re-derive what this statement already knows. Because
+// this must be all-or-nothing rather than "restore whichever ones still match", a stale decision
+// rolls back the whole transaction via tx.rollback() (which rejects db.transaction()'s promise
+// with TransactionRollbackError) instead of leaving a partial restore in place.
 export async function undoFinishTrip(productIds: readonly string[]): Promise<UndoFinishTripResult> {
-  const validIds = productIds.filter(isValidId);
-  if (validIds.length === 0) return { outcome: "ok" };
+  const candidateIds = dedupeValidIds(productIds);
+  if (candidateIds.length === 0) return { outcome: "ok" };
 
   const { from, to } = transitionRule("undoFinishTrip");
   try {
@@ -184,10 +188,14 @@ export async function undoFinishTrip(productIds: readonly string[]): Promise<Und
       const rows = await tx
         .update(products)
         .set({ status: to })
-        .where(and(inArray(products.id, validIds), eq(products.status, from)))
+        .where(and(inArray(products.id, candidateIds), eq(products.status, from)))
         .returning({ id: products.id });
 
-      if (rows.length !== validIds.length) {
+      const matchedIds = new Set(rows.map((row) => row.id));
+      const currentStatuses = candidateIds.map((id) => ({ id, status: matchedIds.has(id) ? from : to }));
+      const decision = decideUndoFinishTrip(candidateIds, currentStatuses);
+
+      if (decision.outcome === "stale") {
         tx.rollback();
       }
     });
