@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidId } from "./ids";
+import { dedupeValidIds, isValidId } from "./ids";
 
 describe("id shape", () => {
   it("accepts a canonical lowercase UUID", () => {
@@ -36,5 +36,27 @@ describe("id shape", () => {
 
   it("rejects a plain word", () => {
     expect(isValidId("not-a-uuid")).toBe(false);
+  });
+});
+
+describe("cleaning a list of ids from outside the domain core", () => {
+  const idA = "3fa85f64-5717-4562-b3fc-2c963f66afa6";
+  const idB = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
+
+  it("keeps every distinct, validly shaped id", () => {
+    expect(dedupeValidIds([idA, idB])).toEqual([idA, idB]);
+  });
+
+  it("drops a malformed id", () => {
+    expect(dedupeValidIds([idA, "not-a-uuid"])).toEqual([idA]);
+  });
+
+  it("collapses a duplicate id to one", () => {
+    expect(dedupeValidIds([idA, idA])).toEqual([idA]);
+  });
+
+  it("returns an empty list when nothing is left", () => {
+    expect(dedupeValidIds([])).toEqual([]);
+    expect(dedupeValidIds(["not-a-uuid"])).toEqual([]);
   });
 });

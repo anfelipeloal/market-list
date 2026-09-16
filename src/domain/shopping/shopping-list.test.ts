@@ -15,13 +15,13 @@ describe("the Shopping List view", () => {
     ];
 
     expect(buildShoppingListView(categories, products)).toEqual([
-      { id: "cat-frutas", name: "Frutas", products: [{ id: "prod-manzana", name: "Manzana" }] },
+      { id: "cat-frutas", name: "Frutas", products: [{ id: "prod-manzana", name: "Manzana", inCart: false }] },
       {
         id: "cat-verduras",
         name: "Verduras",
         products: [
-          { id: "prod-acelga", name: "Acelga" },
-          { id: "prod-zanahoria", name: "Zanahoria" },
+          { id: "prod-acelga", name: "Acelga", inCart: false },
+          { id: "prod-zanahoria", name: "Zanahoria", inCart: false },
         ],
       },
     ]);
@@ -31,7 +31,29 @@ describe("the Shopping List view", () => {
     const products = [{ id: "prod-leche", name: "Leche", categoryId: "cat-frutas", status: "in_cart" as const }];
 
     expect(buildShoppingListView(categories, products)).toEqual([
-      { id: "cat-frutas", name: "Frutas", products: [{ id: "prod-leche", name: "Leche" }] },
+      { id: "cat-frutas", name: "Frutas", products: [{ id: "prod-leche", name: "Leche", inCart: true }] },
+    ]);
+  });
+
+  it("lists Products still needed before In Cart Products within a Category, each A-Z", () => {
+    const products = [
+      { id: "prod-zanahoria", name: "Zanahoria", categoryId: "cat-verduras", status: "in_cart" as const },
+      { id: "prod-acelga", name: "Acelga", categoryId: "cat-verduras", status: "shopping_list" as const },
+      { id: "prod-berenjena", name: "Berenjena", categoryId: "cat-verduras", status: "in_cart" as const },
+      { id: "prod-cebolla", name: "Cebolla", categoryId: "cat-verduras", status: "shopping_list" as const },
+    ];
+
+    expect(buildShoppingListView(categories, products)).toEqual([
+      {
+        id: "cat-verduras",
+        name: "Verduras",
+        products: [
+          { id: "prod-acelga", name: "Acelga", inCart: false },
+          { id: "prod-cebolla", name: "Cebolla", inCart: false },
+          { id: "prod-berenjena", name: "Berenjena", inCart: true },
+          { id: "prod-zanahoria", name: "Zanahoria", inCart: true },
+        ],
+      },
     ]);
   });
 
@@ -39,7 +61,7 @@ describe("the Shopping List view", () => {
     const products = [{ id: "prod-acelga", name: "Acelga", categoryId: "cat-verduras", status: "shopping_list" as const }];
 
     expect(buildShoppingListView(categories, products)).toEqual([
-      { id: "cat-verduras", name: "Verduras", products: [{ id: "prod-acelga", name: "Acelga" }] },
+      { id: "cat-verduras", name: "Verduras", products: [{ id: "prod-acelga", name: "Acelga", inCart: false }] },
     ]);
   });
 
