@@ -10,8 +10,18 @@ const UNIQUE_VIOLATION = "23505";
 // for a duplicate against the rows it read, but a concurrent insert can still win the same name
 // between that read and this insert, so the unique constraint is what actually prevents two rows
 // with the same normalized name (see src/app/actions.ts).
+//
+// Drizzle never lets the driver's own error surface directly: a failed query is wrapped in its own
+// DrizzleQueryError, with the real postgres.PostgresError attached as `.cause` (see
+// drizzle-orm/errors.js). Checking `error` alone (as this used to) never matched, silently
+// rethrowing every unique violation instead of handling it — invisible for Category/Product names,
+// since the domain core's own duplicate check almost always catches those first and this path is
+// only a rarely-hit race guard, but always hit for a duplicate PIN (ticket #13), which the domain
+// core can never check itself (see src/domain/access/create-user.ts). Unwrapping `.cause` one level
+// is enough: DrizzleQueryError never nests further.
 export function isUniqueViolation(error: unknown): boolean {
-  return error instanceof postgres.PostgresError && error.code === UNIQUE_VIOLATION;
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  return cause instanceof postgres.PostgresError && cause.code === UNIQUE_VIOLATION;
 }
 
 export type UniqueWriteResult<TWrite, TExisting> =
