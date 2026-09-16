@@ -11,6 +11,7 @@ import { ShoppingListProductRow } from "./shopping-list-product-row";
 const FINISH_TRIP_EMPTY_MESSAGE = "No hay productos en el carrito.";
 const FINISH_TRIP_STALE_MESSAGE = "La lista cambió. Actualiza la página.";
 const FINISH_TRIP_TOAST_ID = "finish-trip";
+const COPY_TOAST_ID = "copy-shopping-list";
 const UNDO_TIMEOUT_MS = 5000;
 
 const COPY_SUCCESS_MESSAGE = "Lista copiada.";
@@ -60,6 +61,7 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
   // racing a re-render. There is at most one Finish Trip toast at a time, so a single boolean is
   // enough (unlike pantry-search's per-Product Set).
   const undoInFlight = useRef(false);
+  const copyInFlight = useRef(false);
 
   const visibleShoppingList = useMemo(() => {
     const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
@@ -131,14 +133,18 @@ export function ShoppingListView({ shoppingList }: { shoppingList: ShoppingListC
   // button's own `disabled`, in case assistive technology still triggers a tap on it (see the
   // button's aria-label below).
   const handleCopyList = useCallback(async () => {
-    if (shoppingListMarkdown === "") {
+    if (hasNothingToCopy) {
       toast(COPY_EMPTY_MESSAGE);
       return;
     }
+    // A second tap while the first copy is still in flight would stack a duplicate toast.
+    if (copyInFlight.current) return;
+    copyInFlight.current = true;
 
     const copied = await copyToClipboard(shoppingListMarkdown);
-    toast(copied ? COPY_SUCCESS_MESSAGE : COPY_FAILURE_MESSAGE);
-  }, [shoppingListMarkdown]);
+    copyInFlight.current = false;
+    toast(copied ? COPY_SUCCESS_MESSAGE : COPY_FAILURE_MESSAGE, { id: COPY_TOAST_ID });
+  }, [hasNothingToCopy, shoppingListMarkdown]);
 
   const handleFinishTrip = useCallback(() => {
     startFinishTripTransition(async () => {
