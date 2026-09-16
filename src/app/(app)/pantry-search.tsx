@@ -7,11 +7,10 @@ import { CategoryForm } from "./category-form";
 import { PantryProductRow } from "./pantry-product-row";
 import { ProductForm } from "./product-form";
 import { moveToShoppingList, returnToPantry } from "./shopping-actions";
+import { shoppingResultMessage } from "./shopping-messages";
 import type { PantryCategory } from "@/domain/catalog/pantry";
 import { searchPantry } from "@/domain/catalog/search-pantry";
 
-const STALE_MESSAGE = "Este producto cambió. Actualiza la página.";
-const NOT_FOUND_MESSAGE = "No encontramos ese producto.";
 const UNDO_TIMEOUT_MS = 5000;
 
 // The toast's own id is derived from the Product's, so a second move/undo toast for the same
@@ -19,10 +18,6 @@ const UNDO_TIMEOUT_MS = 5000;
 // handleUndo below).
 function moveToastId(productId: string): string {
   return `move-${productId}`;
-}
-
-function messageFor(outcome: "stale" | "notFound"): string {
-  return outcome === "notFound" ? NOT_FOUND_MESSAGE : STALE_MESSAGE;
 }
 
 // Owns the search text and filters the Pantry view on every keystroke, entirely in the browser:
@@ -67,7 +62,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
     const result = await returnToPantry(productId);
     undoInFlight.current.delete(productId);
     if (result.outcome !== "ok") {
-      toast(messageFor(result.outcome));
+      toast(shoppingResultMessage(result.outcome));
       return;
     }
     setHiddenProductIds((prev) => {
@@ -84,7 +79,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
     async (productId: string, productName: string): Promise<boolean> => {
       const result = await moveToShoppingList(productId);
       if (result.outcome !== "ok") {
-        toast(messageFor(result.outcome));
+        toast(shoppingResultMessage(result.outcome));
         return false;
       }
 
