@@ -17,8 +17,10 @@ export default async function ShoppingListPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
-      {/* isAdmin is resolved here, server-side, and only ever used to decide what to render:
+      {/* The heading renders inside ShoppingListView itself (not here) so the pull-to-refresh
+          gesture's container covers the whole screen, heading included -- see
+          use-refresh-on-return.ts.
+          isAdmin is resolved here, server-side, and only ever used to decide what to render:
           resetShoppingList (ticket #12) enforces the real Admin check itself via requireAdmin(),
           so a stale or tampered client can never use this prop to bypass it. */}
       <ShoppingListView shoppingList={shoppingList} isAdmin={user.isAdmin} />

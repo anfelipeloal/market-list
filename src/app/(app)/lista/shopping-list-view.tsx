@@ -102,17 +102,20 @@ export function ShoppingListView({
 
   // Refresh on return and pull-to-refresh (ticket #16): same mechanism and the same reasoning as
   // pantry-search.tsx's own use of useRefreshOnReturn, applied to this screen's two local
-  // overrides instead of one. Once the fresh `shoppingList` prop has actually landed, both are
-  // cleared: a stale inCartOverrides entry could otherwise show a Product as In Cart (or not) a
-  // moment after someone else genuinely changed it back, and a stale hiddenProductIds entry (from
-  // this session's own earlier Finish Trip or Reset) could keep hiding a Product that legitimately
-  // returned to the Shopping List under the same id before this refresh. Clearing here is safe
-  // because it always runs after the new data replaces the old, never before.
+  // overrides instead of one; containerRef also wraps the "Lista de compras" heading (rendered
+  // here, not in page.tsx) so a pull starting on the heading works too. Once the fresh
+  // `shoppingList` prop has actually landed, and no mutation of our own set an override while that
+  // refresh was in flight (see notifyMutation calls below and src/domain/refresh/mutation-guard.ts),
+  // both overrides are cleared: a stale inCartOverrides entry could otherwise show a Product as In
+  // Cart (or not) a moment after someone else genuinely changed it back, and a stale
+  // hiddenProductIds entry (from this session's own earlier Finish Trip or Reset) could keep hiding
+  // a Product that legitimately returned to the Shopping List under the same id before this
+  // refresh.
   const handleRefreshed = useCallback(() => {
     setInCartOverrides(new Map());
     setHiddenProductIds(new Set());
   }, []);
-  const { containerRef, isRefreshing, pull } = useRefreshOnReturn(handleRefreshed);
+  const { containerRef, isRefreshing, pull, notifyMutation } = useRefreshOnReturn(handleRefreshed);
 
   const visibleShoppingList = useMemo(() => {
     const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
@@ -143,14 +146,18 @@ export function ShoppingListView({
   );
   const hasNothingToCopy = shoppingListMarkdown === "";
 
-  const handleToggle = useCallback(async (productId: string, currentlyInCart: boolean) => {
-    const result = await toggleInCart(productId);
-    if (result.outcome !== "ok") {
-      toast(shoppingResultMessage(result.outcome));
-      return;
-    }
-    setInCartOverrides((prev) => new Map(prev).set(productId, !currentlyInCart));
-  }, []);
+  const handleToggle = useCallback(
+    async (productId: string, currentlyInCart: boolean) => {
+      const result = await toggleInCart(productId);
+      if (result.outcome !== "ok") {
+        toast(shoppingResultMessage(result.outcome));
+        return;
+      }
+      notifyMutation();
+      setInCartOverrides((prev) => new Map(prev).set(productId, !currentlyInCart));
+    },
+    [notifyMutation],
+  );
 
   const handleUndoFinishTrip = useCallback(async (affectedIds: string[]) => {
     if (undoInFlight.current) return;
@@ -166,6 +173,7 @@ export function ShoppingListView({
       return;
     }
 
+    notifyMutation();
     setHiddenProductIds((prev) => {
       const next = new Set(prev);
       for (const id of affectedIds) next.delete(id);
@@ -176,7 +184,7 @@ export function ShoppingListView({
       for (const id of affectedIds) next.set(id, true);
       return next;
     });
-  }, []);
+  }, [notifyMutation]);
 
   // Copiar lista (ticket #11): puts the still-needed Products as a markdown checklist on the
   // clipboard, grouped by Category, so they can be pasted into a chat. Read-only — it never calls
@@ -206,6 +214,7 @@ export function ShoppingListView({
       }
 
       const { affectedIds } = result;
+      notifyMutation();
       setHiddenProductIds((prev) => new Set([...prev, ...affectedIds]));
       toast(finishTripMessage(affectedIds.length), {
         id: FINISH_TRIP_TOAST_ID,
@@ -218,7 +227,7 @@ export function ShoppingListView({
         },
       });
     });
-  }, [handleUndoFinishTrip]);
+  }, [handleUndoFinishTrip, notifyMutation]);
 
   // Reiniciar lista (ticket #12, Admin-only): confirmed via the AlertDialog below rather than an
   // undo notification, since Reset has no undo (see CONTEXT.md). resetShoppingList() enforces the
@@ -240,6 +249,7 @@ export function ShoppingListView({
       // Both outcomes end with an empty Shopping List, so hide what is on screen either way:
       // "empty" means someone else already reset it and this screen is showing stale Products.
       const allProductIds = shoppingList.flatMap((category) => category.products.map((product) => product.id));
+      notifyMutation();
       setHiddenProductIds((prev) => new Set([...prev, ...allProductIds]));
 
       if (result.outcome === "empty") {
@@ -249,11 +259,12 @@ export function ShoppingListView({
 
       toast(resetMessage(result.count), { id: RESET_TOAST_ID });
     });
-  }, [shoppingList]);
+  }, [shoppingList, notifyMutation]);
 
   return (
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
+      <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
       {visibleShoppingList.length === 0 ? (
         <p className="mt-6 text-muted-foreground">La lista de compras está vacía.</p>
       ) : (

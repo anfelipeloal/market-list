@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import type { PullToRefreshState } from "@/domain/pull-to-refresh";
+import type { PullToRefreshState } from "@/domain/refresh/pull-to-refresh";
 
 // The visible + announced feedback for ticket #16's refresh on return and pull-to-refresh, shared
 // by pantry-search.tsx and shopping-list-view.tsx. Idle shows nothing at all -- the Spanish copy

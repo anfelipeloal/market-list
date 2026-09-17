@@ -35,13 +35,17 @@ function moveToastId(productId: string): string {
 // move, without waiting for a full navigation.
 //
 // Refresh on return and pull-to-refresh (ticket #16): useRefreshOnReturn wires router.refresh() to
-// focus/visibility and a pull gesture at the top of the screen (see use-refresh-on-return.ts). Its
-// onRefreshed callback clears hiddenProductIds once the fresh `pantry` prop has actually landed:
-// without that, an id hidden earlier this session (e.g. moved away, then moved back to the Pantry
-// by anyone, on any device, before this refresh) would keep hiding a Product the server now says
-// belongs here again — a stale local override resurrecting nothing, but wrongly suppressing a
-// fresh row. Clearing it here is safe exactly because it happens after the new data is in: nothing
-// this session hid is still "in flight" by the time onRefreshed runs.
+// focus/visibility and a pull gesture across this screen's whole content -- containerRef wraps the
+// "Despensa" heading too (rendered here, not in page.tsx, for exactly that reason), so a pull
+// starting on the heading works the same as one starting lower down; only BottomNav, entirely
+// outside this component, is never part of the gesture. Its onRefreshed callback clears
+// hiddenProductIds once the fresh `pantry` prop has actually landed: without that, an id hidden
+// earlier this session (e.g. moved away, then moved back to the Pantry by anyone, on any device,
+// before this refresh) would keep hiding a Product the server now says belongs here again — a
+// stale local override resurrecting nothing, but wrongly suppressing a fresh row. Clearing it here
+// is safe exactly because it happens after the new data is in, and only when no mutation of our
+// own set an override while that refresh was still in flight (see notifyMutation below and
+// src/domain/refresh/mutation-guard.ts).
 export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   const [searchText, setSearchText] = useState("");
   const [hiddenProductIds, setHiddenProductIds] = useState<ReadonlySet<string>>(new Set());
@@ -49,7 +53,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   const handleRefreshed = useCallback(() => {
     setHiddenProductIds(new Set());
   }, []);
-  const { containerRef, isRefreshing, pull } = useRefreshOnReturn(handleRefreshed);
+  const { containerRef, isRefreshing, pull, notifyMutation } = useRefreshOnReturn(handleRefreshed);
   // Tracks which Products already have an undo in flight, checked and set synchronously (a ref,
   // not state) so a second "Deshacer" tap — dispatched as its own, separate click event even when
   // it lands a moment after the first — sees the guard immediately rather than racing a
@@ -80,12 +84,16 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
       toast(shoppingResultMessage(result.outcome));
       return;
     }
+    // Reported before setting the override itself (see useRefreshOnReturn's module doc): a
+    // hook-triggered refresh already in flight when this lands must not clear this override
+    // against its own, now-stale snapshot.
+    notifyMutation();
     setHiddenProductIds((prev) => {
       const next = new Set(prev);
       next.delete(productId);
       return next;
     });
-  }, []);
+  }, [notifyMutation]);
 
   // Moves a Product to the Shopping List and, on success, hides it here and shows the undo
   // notification; returns whether the move actually happened so callers (the tap handler below,
@@ -98,6 +106,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
         return false;
       }
 
+      notifyMutation();
       setHiddenProductIds((prev) => new Set(prev).add(productId));
       toast(`${productName} se agregó a la lista de compras.`, {
         id: moveToastId(productId),
@@ -111,7 +120,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
       });
       return true;
     },
-    [handleUndo],
+    [handleUndo, notifyMutation],
   );
 
   const trimmedSearch = searchText.trim();
@@ -122,6 +131,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   return (
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
+      <h1 className="text-2xl font-semibold tracking-tight">Despensa</h1>
       <div className="mt-4">
         <label htmlFor={inputId} className="sr-only">
           Buscar en la despensa
