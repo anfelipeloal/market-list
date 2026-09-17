@@ -2,9 +2,11 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { attemptMutation, OFFLINE_MUTATION_MESSAGE } from "../offline-mutation";
 import { RefreshIndicator } from "../refresh-indicator";
 import { finishTrip, resetShoppingList, toggleInCart, undoFinishTrip } from "../shopping-actions";
 import { shoppingResultMessage } from "../shopping-messages";
+import { useIsOffline } from "../use-is-offline";
 import { useRefreshOnReturn } from "../use-refresh-on-return";
 import { buildShoppingListView, type ShoppingListCategory } from "@/domain/shopping/shopping-list";
 import { buildShoppingListMarkdown } from "@/domain/shopping/shopping-list-markdown";
@@ -116,6 +118,9 @@ export function ShoppingListView({
     setHiddenProductIds(new Set());
   }, []);
   const { containerRef, isRefreshing, pull, notifyMutation } = useRefreshOnReturn(handleRefreshed);
+  // Drives the "Sin conexión..." indication below (ticket #17): a plain connectivity mirror, not
+  // the mutation-refusal decision (src/domain/offline/mutation-refusal.ts) -- see use-is-offline.ts.
+  const isOffline = useIsOffline();
 
   const visibleShoppingList = useMemo(() => {
     const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
@@ -148,7 +153,12 @@ export function ShoppingListView({
 
   const handleToggle = useCallback(
     async (productId: string, currentlyInCart: boolean) => {
-      const result = await toggleInCart(productId);
+      const attempt = await attemptMutation(() => toggleInCart(productId));
+      if (attempt.outcome === "offline") {
+        toast(OFFLINE_MUTATION_MESSAGE);
+        return;
+      }
+      const result = attempt.value;
       if (result.outcome !== "ok") {
         toast(shoppingResultMessage(result.outcome));
         return;
@@ -166,8 +176,13 @@ export function ShoppingListView({
     // either; the ref guard above covers any tap that still lands before this takes effect.
     toast.dismiss(FINISH_TRIP_TOAST_ID);
 
-    const result = await undoFinishTrip(affectedIds);
+    const attempt = await attemptMutation(() => undoFinishTrip(affectedIds));
     undoInFlight.current = false;
+    if (attempt.outcome === "offline") {
+      toast(OFFLINE_MUTATION_MESSAGE);
+      return;
+    }
+    const result = attempt.value;
     if (result.outcome !== "ok") {
       toast(FINISH_TRIP_STALE_MESSAGE);
       return;
@@ -207,7 +222,12 @@ export function ShoppingListView({
 
   const handleFinishTrip = useCallback(() => {
     startFinishTripTransition(async () => {
-      const result = await finishTrip();
+      const attempt = await attemptMutation(() => finishTrip());
+      if (attempt.outcome === "offline") {
+        toast(OFFLINE_MUTATION_MESSAGE);
+        return;
+      }
+      const result = attempt.value;
       if (result.outcome === "empty") {
         toast(FINISH_TRIP_EMPTY_MESSAGE);
         return;
@@ -239,8 +259,14 @@ export function ShoppingListView({
   // covers the rest).
   const handleResetShoppingList = useCallback(() => {
     startResetTransition(async () => {
-      const result = await resetShoppingList();
+      const attempt = await attemptMutation(() => resetShoppingList());
       setResetDialogOpen(false);
+
+      if (attempt.outcome === "offline") {
+        toast(OFFLINE_MUTATION_MESSAGE, { id: RESET_TOAST_ID });
+        return;
+      }
+      const result = attempt.value;
 
       if (result.outcome === "forbidden") {
         toast(RESET_FORBIDDEN_MESSAGE, { id: RESET_TOAST_ID });
@@ -265,6 +291,14 @@ export function ShoppingListView({
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
       <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
+      {/* role="status" announces this to assistive tech the moment it appears, without needing a
+          separate aria-live region (ticket #17): offline shows the last cached list, which may no
+          longer match what other Users have since changed. */}
+      {isOffline && (
+        <p role="status" className="mt-4 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">
+          Sin conexión. Estás viendo la última lista guardada.
+        </p>
+      )}
       {visibleShoppingList.length === 0 ? (
         <p className="mt-6 text-muted-foreground">La lista de compras está vacía.</p>
       ) : (
