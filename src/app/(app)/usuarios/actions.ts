@@ -23,7 +23,7 @@ import { validateUserRename } from "@/domain/access/rename-user";
 import { validateRevokeAdmin } from "@/domain/access/revoke-admin";
 import { requireAdmin } from "@/lib/session";
 import { SESSION_COOKIE_NAME } from "@/lib/session-cookie";
-import { ADMIN_ONLY_MESSAGE } from "./messages";
+import { ADMIN_ONLY_MESSAGE, USER_NOT_FOUND_MESSAGE } from "./messages";
 
 export type CreateUserState = { error: string } | undefined;
 
@@ -69,12 +69,12 @@ export async function renameUser(_prevState: RenameUserState, formData: FormData
   const userId = String(formData.get("userId") ?? "");
   const rawName = String(formData.get("name") ?? "");
   const existingUsers = await listUsers();
-  const result = validateUserRename(userId, rawName, existingUsers);
+  const result = validateUserRename(existingUsers, userId, rawName);
 
   if (result.outcome === "notFound") {
     // The id comes from the edit page's own URL, so this only fires if the User was removed by
     // another Admin in the meantime or the request was tampered with.
-    return { error: "No encontramos ese usuario." };
+    return { error: USER_NOT_FOUND_MESSAGE };
   }
   if (result.outcome === "emptyName") return { error: "Escribe un nombre." };
   if (result.outcome === "duplicateName") return { error: "Ya existe un usuario con ese nombre." };
@@ -164,7 +164,7 @@ export async function changePin(userId: string, newPin: string): Promise<ChangeP
   if (!isValidId(userId)) return { outcome: "notFound" };
 
   const existingUsers = await listUsers();
-  const decision = validatePinChange(userId, newPin, existingUsers);
+  const decision = validatePinChange(existingUsers, userId, newPin);
   if (decision.outcome === "notFound") return { outcome: "notFound" };
   if (decision.outcome === "invalidPin") return { outcome: "invalidPin" };
 

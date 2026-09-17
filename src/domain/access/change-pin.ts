@@ -16,7 +16,11 @@ export type ChangePinResult =
 // on. That half of the rule is only enforced by the database's unique index on pin_hash; the
 // caller maps a unique violation on that index to a "duplicatePin" outcome of its own (see
 // src/db/users.ts#updateUserPin and src/app/(app)/usuarios/actions.ts#changePin).
-export function validatePinChange(userId: string, pin: string, existingUsers: readonly User[]): ChangePinResult {
+//
+// Parameter order is (existingUsers, userId, pin) — the same order every Access validator that
+// targets an existing User uses (validateUserRemoval, validateUserRename, validateGrantAdmin,
+// validateRevokeAdmin): current state first, then the target, then any new data.
+export function validatePinChange(existingUsers: readonly User[], userId: string, pin: string): ChangePinResult {
   const user = existingUsers.find((candidate) => candidate.id === userId);
   if (!user) return { outcome: "notFound" };
 

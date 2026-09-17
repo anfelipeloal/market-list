@@ -16,12 +16,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { grantAdmin, removeUser, revokeAdmin } from "./actions";
-import { ADMIN_ONLY_MESSAGE } from "./messages";
+import { userActionRefusalMessage } from "./messages";
 
 const REMOVE_TOAST_ID = "remove-user";
 const ROLE_TOAST_ID = "toggle-admin-role";
-const LAST_ADMIN_MESSAGE = "Debe quedar al menos un administrador.";
-const NOT_FOUND_MESSAGE = "No encontramos ese usuario.";
 
 // One row of the Usuarios list (ticket #13, extended by #14): a link to edit this User (rename,
 // Change PIN), a role toggle ("Hacer administrador" / "Quitar administrador"), and an "Eliminar"
@@ -47,15 +45,7 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
         onRemoved(user.id);
         return;
       }
-      if (result.outcome === "forbidden") {
-        toast(ADMIN_ONLY_MESSAGE, { id: REMOVE_TOAST_ID });
-        return;
-      }
-      if (result.outcome === "lastAdmin") {
-        toast(LAST_ADMIN_MESSAGE, { id: REMOVE_TOAST_ID });
-        return;
-      }
-      toast(NOT_FOUND_MESSAGE, { id: REMOVE_TOAST_ID });
+      toast(userActionRefusalMessage(result.outcome), { id: REMOVE_TOAST_ID });
     });
   };
 
@@ -71,11 +61,7 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
         toast(`${user.name} ahora es administrador.`, { id: ROLE_TOAST_ID });
         return;
       }
-      if (result.outcome === "forbidden") {
-        toast(ADMIN_ONLY_MESSAGE, { id: ROLE_TOAST_ID });
-        return;
-      }
-      toast(NOT_FOUND_MESSAGE, { id: ROLE_TOAST_ID });
+      toast(userActionRefusalMessage(result.outcome), { id: ROLE_TOAST_ID });
     });
   };
 
@@ -91,15 +77,7 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
         toast(`${user.name} ya no es administrador.`, { id: ROLE_TOAST_ID });
         return;
       }
-      if (result.outcome === "forbidden") {
-        toast(ADMIN_ONLY_MESSAGE, { id: ROLE_TOAST_ID });
-        return;
-      }
-      if (result.outcome === "lastAdmin") {
-        toast(LAST_ADMIN_MESSAGE, { id: ROLE_TOAST_ID });
-        return;
-      }
-      toast(NOT_FOUND_MESSAGE, { id: ROLE_TOAST_ID });
+      toast(userActionRefusalMessage(result.outcome), { id: ROLE_TOAST_ID });
     });
   };
 

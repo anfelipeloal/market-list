@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { findUserById } from "@/db/users";
 import { requireAdmin } from "@/lib/session";
-import { ADMIN_ONLY_MESSAGE } from "@/app/(app)/usuarios/messages";
+import { ADMIN_ONLY_MESSAGE, USER_NOT_FOUND_MESSAGE } from "@/app/(app)/usuarios/messages";
 import { ChangePinForm } from "./change-pin-form";
 import { EditUserForm } from "./edit-user-form";
 
@@ -48,7 +48,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
           <ChangePinForm userId={user.id} isSelf={user.id === admin.user.id} />
         </>
       ) : (
-        <p className="mt-6 text-muted-foreground">No encontramos ese usuario.</p>
+        <p className="mt-6 text-muted-foreground">{USER_NOT_FOUND_MESSAGE}</p>
       )}
     </main>
   );

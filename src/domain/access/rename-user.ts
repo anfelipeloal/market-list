@@ -13,7 +13,12 @@ export type RenameUserResult =
 // excludes the User being renamed, exactly like a Category or Product rename (see
 // src/domain/catalog/rename-category.ts). Changing a User's PIN or Admin role is out of scope for
 // this ticket (#14); only the name changes here.
-export function validateUserRename(userId: string, rawName: string, existingUsers: readonly User[]): RenameUserResult {
+//
+// Parameter order is (existingUsers, userId, ...rest) — the current state first, then the target,
+// then any new data — the same order every Access validator that targets an existing User uses
+// (validateUserRemoval, validateGrantAdmin, validateRevokeAdmin, validatePinChange), so a caller
+// never has to check which argument comes first for which function.
+export function validateUserRename(existingUsers: readonly User[], userId: string, rawName: string): RenameUserResult {
   const user = existingUsers.find((candidate) => candidate.id === userId);
   if (!user) return { outcome: "notFound" };
 

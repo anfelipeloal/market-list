@@ -3,7 +3,7 @@
 import { useCallback, useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { changePin } from "@/app/(app)/usuarios/actions";
-import { ADMIN_ONLY_MESSAGE } from "@/app/(app)/usuarios/messages";
+import { userActionRefusalMessage } from "@/app/(app)/usuarios/messages";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,6 @@ import {
 const CHANGE_PIN_TOAST_ID = "change-pin";
 const INVALID_PIN_MESSAGE = "El PIN debe tener 4 dígitos.";
 const DUPLICATE_PIN_MESSAGE = "Ese PIN ya está en uso.";
-const NOT_FOUND_MESSAGE = "No encontramos ese usuario.";
 const SUCCESS_MESSAGE = "PIN actualizado.";
 // Shown only when isSelf (ticket #14's decision): an Admin changing anyone ELSE's PIN stays on
 // this screen with nothing more to warn about, since only the target User's Sessions end
@@ -58,7 +57,7 @@ export function ChangePinForm({ userId, isSelf }: { userId: string; isSelf: bool
         return;
       }
       if (result.outcome === "forbidden") {
-        toast(ADMIN_ONLY_MESSAGE, { id: CHANGE_PIN_TOAST_ID });
+        toast(userActionRefusalMessage(result.outcome), { id: CHANGE_PIN_TOAST_ID });
         return;
       }
       if (result.outcome === "invalidPin") {
@@ -69,7 +68,7 @@ export function ChangePinForm({ userId, isSelf }: { userId: string; isSelf: bool
         setError(DUPLICATE_PIN_MESSAGE);
         return;
       }
-      setError(NOT_FOUND_MESSAGE);
+      setError(userActionRefusalMessage(result.outcome));
     });
   }, [userId, pin, isSelf]);
 
