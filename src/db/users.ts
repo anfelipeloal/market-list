@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { normalizeName } from "@/domain/catalog/names";
 import { isValidId } from "@/domain/ids";
 import { isValidPin } from "@/domain/access/pin";
@@ -8,6 +8,12 @@ import { hashPin } from "@/lib/pin-hash";
 import { isUniqueViolation } from "./pg-errors";
 import { db, type Tx } from "./client";
 import { users } from "./schema";
+
+// Either the plain db client or a transaction handle: every function below that a caller might
+// need to run inside withAdminGuardLock's transaction (see below) accepts this instead of
+// hardcoding `db`, so the same statements work whether or not they're serialized by that lock —
+// exactly like src/db/sign-in-attempts.ts's functions accept a Tx for the same reason.
+type DbOrTx = Tx | typeof db;
 
 export type SignedInUser = { id: string; name: string; isAdmin: boolean };
 
@@ -53,12 +59,38 @@ export async function ensureFirstAdminExists(tx: Tx): Promise<void> {
     .onConflictDoNothing();
 }
 
+// Arbitrary fixed key namespacing the Admin-count guard's serialization lock (see
+// withAdminGuardLock below). Distinct from SIGN_IN_LOCK_KEY (src/db/sign-in-attempts.ts) — every
+// advisory lock needs its own constant, and this one guards a different invariant.
+const ADMIN_GUARD_LOCK_KEY = 20_260_013;
+
+// Runs `run` inside one transaction serialized by a transaction-scoped Postgres advisory lock, so
+// two changes to who is an Admin can never both pass the last-Admin check at once. Without this,
+// removeUser's read-decide-delete (src/app/(app)/usuarios/actions.ts) is three unserialized round
+// trips: two Admins removing each other at nearly the same moment could each read the same
+// "two Admins" snapshot, each decide their own removal is safe, and both deletes commit — leaving
+// the Household with zero Admins, breaking CONTEXT.md's invariant that it always has at least one.
+// Modeled on withSignInLock (src/db/sign-in-attempts.ts), which serializes the sign-in lockout's
+// own read-decide-record sequence the same way.
+//
+// Every caller must re-read the Users INSIDE this transaction (not before it) via the `tx` this
+// hands to `run`, and write inside it too. Ticket #14 (granting/revoking the Admin role) must
+// reuse this same lock: a demotion racing a removal is exactly the same failure.
+export async function withAdminGuardLock<T>(run: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(${ADMIN_GUARD_LOCK_KEY})`);
+    return run(tx);
+  });
+}
+
 // Powers the Usuarios screen (ticket #13, Admin-only — enforced by requireAdmin before this is
 // ever called) and every create/rename/removal action below, which need every User's name and
 // Admin flag to run the domain core's decisions (checkNameCollision, validateUserRemoval's
-// last-Admin guard). Never selects pinHash: see USER_COLUMNS above.
-export async function listUsers(): Promise<SignedInUser[]> {
-  return db.select(USER_COLUMNS).from(users);
+// last-Admin guard). Never selects pinHash: see USER_COLUMNS above. Accepts a transaction handle
+// (see DbOrTx) so removeUser can re-read the Users inside withAdminGuardLock's transaction rather
+// than before it.
+export async function listUsers(client: DbOrTx = db): Promise<SignedInUser[]> {
+  return client.select(USER_COLUMNS).from(users);
 }
 
 // Re-reads a User by normalized name after a unique-constraint race (see src/db/pg-errors.ts and
@@ -127,12 +159,15 @@ export async function updateUserName(id: string, name: string, normalizedName: s
 }
 
 // Removes a User (ticket #13, Admin-only — the last-Admin guard is the domain core's
-// validateUserRemoval, applied by the caller before this ever runs). Deletes that User's Sessions
-// as a side effect of the foreign key's ON DELETE CASCADE (see src/db/schema.ts, sessions.userId),
-// ending their access immediately instead of waiting for their session to expire on its own.
-export async function deleteUser(id: string): Promise<SignedInUser | null> {
+// validateUserRemoval, applied by the caller before this ever runs, inside withAdminGuardLock's
+// transaction). Deletes that User's Sessions as a side effect of the foreign key's ON DELETE
+// CASCADE (see src/db/schema.ts, sessions.userId), ending their access immediately instead of
+// waiting for their session to expire on its own. Accepts a transaction handle (see DbOrTx) so the
+// delete commits (or rolls back) as part of the same locked transaction as the read that decided
+// it was safe.
+export async function deleteUser(id: string, client: DbOrTx = db): Promise<SignedInUser | null> {
   if (!isValidId(id)) return null;
 
-  const [user] = await db.delete(users).where(eq(users.id, id)).returning(USER_COLUMNS);
+  const [user] = await client.delete(users).where(eq(users.id, id)).returning(USER_COLUMNS);
   return user ?? null;
 }
