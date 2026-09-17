@@ -13,7 +13,8 @@ export default async function PantryPage() {
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Despensa</h1>
+      {/* The heading renders inside PantrySearch itself (not here) so the pull-to-refresh gesture's
+          container covers the whole screen, heading included -- see use-refresh-on-return.ts. */}
       <PantrySearch pantry={pantry} />
     </main>
   );
