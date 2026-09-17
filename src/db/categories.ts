@@ -3,6 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { isValidId } from "@/domain/ids";
 import { db } from "./client";
+import { isForeignKeyViolation } from "./pg-errors";
 import { categories } from "./schema";
 
 export type CategoryRow = { id: string; name: string };
@@ -58,4 +59,29 @@ export async function updateCategoryName(id: string, name: string, normalizedNam
     .where(eq(categories.id, id))
     .returning({ id: categories.id, name: categories.name });
   return category;
+}
+
+export type DeleteCategoryResult = { outcome: "deleted" } | { outcome: "hasProducts" } | { outcome: "notFound" };
+
+// Deletes a Category (ticket #15, Admin-only — enforced by src/lib/session.ts#requireAdmin before
+// this is ever called), the same delete-by-id shape as deleteUser (src/db/users.ts): an unknown or
+// malformed id, or a Category already deleted by a concurrent request for the same id, is reported
+// as "notFound" via a null RETURNING result rather than a database error. The domain core
+// (validateCategoryDeletion, src/domain/catalog/delete-category.ts) already checked the Category
+// has no Products against the rows it read, but a concurrent create-Product
+// (src/db/products.ts#insertProduct) could still land in this Category between that read and this
+// delete; the products.categoryId "on delete restrict" constraint (src/db/schema.ts) is the final
+// guard for that race, and a foreign-key violation here is mapped back to the same "hasProducts"
+// refusal the domain core would have returned itself (see
+// src/db/pg-errors.ts#isForeignKeyViolation) instead of surfacing as an uncaught error.
+export async function deleteCategory(id: string): Promise<DeleteCategoryResult> {
+  if (!isValidId(id)) return { outcome: "notFound" };
+
+  try {
+    const [deleted] = await db.delete(categories).where(eq(categories.id, id)).returning({ id: categories.id });
+    return deleted ? { outcome: "deleted" } : { outcome: "notFound" };
+  } catch (error) {
+    if (!isForeignKeyViolation(error)) throw error;
+    return { outcome: "hasProducts" };
+  }
 }
