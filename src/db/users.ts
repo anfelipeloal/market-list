@@ -7,7 +7,7 @@ import { isValidPin } from "@/domain/access/pin";
 import { hashPin } from "@/lib/pin-hash";
 import { isUniqueViolation } from "./pg-errors";
 import { db, type Tx } from "./client";
-import { users } from "./schema";
+import { sessions, users } from "./schema";
 
 // Either the plain db client or a transaction handle: every function below that a caller might
 // need to run inside withAdminGuardLock's transaction (see below) accepts this instead of
@@ -169,5 +169,55 @@ export async function deleteUser(id: string, client: DbOrTx = db): Promise<Signe
   if (!isValidId(id)) return null;
 
   const [user] = await client.delete(users).where(eq(users.id, id)).returning(USER_COLUMNS);
+  return user ?? null;
+}
+
+export type UpdateUserPinResult = { outcome: "written" } | { outcome: "duplicatePin" } | { outcome: "notFound" };
+
+// Changes a User's PIN (ticket #14, Admin-only) and ends every one of their Sessions in the same
+// transaction, so a User can never be left signed in under the old PIN, nor briefly signed in
+// under neither (see CONTEXT.md's Change PIN and ADR-0001's server-side Sessions). This runs in
+// its own transaction rather than inside withAdminGuardLock's: the Admin-count invariant that lock
+// protects (src/db/users.ts#withAdminGuardLock) is untouched by a PIN change, which never affects
+// who is an Admin.
+//
+// Unlike insertUserOrDuplicate, a unique violation here can only be on pin_hash: this update never
+// touches normalizedName, so there is no second unique column to disambiguate and no re-read is
+// needed to build the message — ticket #13's "Ese PIN ya está en uso." is returned directly. A
+// notFound result (the target User no longer existing) is only reachable in practice through a
+// concurrent removal of that exact User between the caller's own read and this write, since
+// changePin (src/app/(app)/usuarios/actions.ts) re-validates against a fresh read of the Users
+// just before calling this.
+export async function updateUserPin(id: string, pin: string): Promise<UpdateUserPinResult> {
+  if (!isValidId(id)) {
+    throw new Error(`updateUserPin called with a malformed id: ${JSON.stringify(id)}`);
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const [user] = await tx.update(users).set({ pinHash: hashPin(pin) }).where(eq(users.id, id)).returning(USER_COLUMNS);
+      if (!user) return { outcome: "notFound" } as const;
+
+      await tx.delete(sessions).where(eq(sessions.userId, id));
+      return { outcome: "written" } as const;
+    });
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    return { outcome: "duplicatePin" };
+  }
+}
+
+// Sets a User's Admin flag (ticket #14): the write half of granting or revoking the Admin role,
+// applied only after the domain core (validateGrantAdmin / validateRevokeAdmin, see
+// src/domain/access/grant-admin.ts and revoke-admin.ts) decided it's safe. Accepts a transaction
+// handle (see DbOrTx) because both callers (src/app/(app)/usuarios/actions.ts#grantAdmin and
+// #revokeAdmin) must run their read, decision and write inside withAdminGuardLock's transaction —
+// a demotion racing a removal or another demotion is exactly the failure that lock prevents (see
+// withAdminGuardLock's own comment above). Unlike updateUserPin, this never touches Sessions:
+// granting or revoking the Admin role doesn't end them (see CONTEXT.md).
+export async function setUserAdmin(id: string, isAdmin: boolean, client: DbOrTx = db): Promise<SignedInUser | null> {
+  if (!isValidId(id)) return null;
+
+  const [user] = await client.update(users).set({ isAdmin }).where(eq(users.id, id)).returning(USER_COLUMNS);
   return user ?? null;
 }

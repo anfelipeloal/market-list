@@ -1,14 +1,29 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { deleteUser, findUserByNormalizedName, insertUserOrDuplicate, listUsers, updateUserName, withAdminGuardLock } from "@/db/users";
+import {
+  deleteUser,
+  findUserByNormalizedName,
+  insertUserOrDuplicate,
+  listUsers,
+  setUserAdmin,
+  updateUserName,
+  updateUserPin,
+  withAdminGuardLock,
+} from "@/db/users";
 import { writeUniqueOrDuplicate } from "@/db/pg-errors";
+import { validatePinChange } from "@/domain/access/change-pin";
 import { validateNewUser } from "@/domain/access/create-user";
+import { validateGrantAdmin } from "@/domain/access/grant-admin";
+import { isValidId } from "@/domain/ids";
 import { validateUserRemoval } from "@/domain/access/remove-user";
 import { validateUserRename } from "@/domain/access/rename-user";
+import { validateRevokeAdmin } from "@/domain/access/revoke-admin";
 import { requireAdmin } from "@/lib/session";
-import { ADMIN_ONLY_MESSAGE } from "./messages";
+import { SESSION_COOKIE_NAME } from "@/lib/session-cookie";
+import { ADMIN_ONLY_MESSAGE, USER_NOT_FOUND_MESSAGE } from "./messages";
 
 export type CreateUserState = { error: string } | undefined;
 
@@ -54,12 +69,12 @@ export async function renameUser(_prevState: RenameUserState, formData: FormData
   const userId = String(formData.get("userId") ?? "");
   const rawName = String(formData.get("name") ?? "");
   const existingUsers = await listUsers();
-  const result = validateUserRename(userId, rawName, existingUsers);
+  const result = validateUserRename(existingUsers, userId, rawName);
 
   if (result.outcome === "notFound") {
     // The id comes from the edit page's own URL, so this only fires if the User was removed by
     // another Admin in the meantime or the request was tampered with.
-    return { error: "No encontramos ese usuario." };
+    return { error: USER_NOT_FOUND_MESSAGE };
   }
   if (result.outcome === "emptyName") return { error: "Escribe un nombre." };
   if (result.outcome === "duplicateName") return { error: "Ya existe un usuario con ese nombre." };
@@ -115,6 +130,110 @@ export async function removeUser(userId: string): Promise<RemoveUserResult> {
       // somehow requested twice) reaches here.
       return { outcome: "notFound" } as const;
     }
+    return { outcome: "ok" } as const;
+  });
+
+  if (result.outcome === "ok") revalidatePath("/usuarios");
+  return result;
+}
+
+export type ChangePinResult =
+  | { outcome: "ok" }
+  | { outcome: "notFound" }
+  | { outcome: "invalidPin" }
+  | { outcome: "duplicatePin" }
+  | { outcome: "forbidden" };
+
+// Changes a User's PIN (ticket #14, Admin-only), including the acting Admin's own. Name and role
+// are untouched (see validateUserRename above for those). Format is validated by the domain core
+// (validatePinChange, src/domain/access/change-pin.ts) first; the PIN's own uniqueness can only be
+// checked by the database (see that function's own comment), so a unique violation is mapped to
+// "Ese PIN ya está en uso." here — same message and same reasoning as createUser above.
+//
+// updateUserPin (src/db/users.ts) ends every one of that User's Sessions in the same transaction
+// as the PIN write, so access under the old PIN stops immediately (CONTEXT.md's Change PIN). When
+// the changed User is the one currently signed in, their own session row is one of the ones just
+// deleted: their next request would find no valid Session and be redirected to /ingresar anyway
+// (src/lib/session.ts#requireUser), but clearing the cookie and redirecting here — rather than
+// returning "ok" to a page they can no longer use — sends them there immediately instead of on
+// their next accidental navigation. ChangePinForm (./[id]/editar/change-pin-form.tsx) warns about
+// this in a confirmation dialog before ever calling this action.
+export async function changePin(userId: string, newPin: string): Promise<ChangePinResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+  if (!isValidId(userId)) return { outcome: "notFound" };
+
+  const existingUsers = await listUsers();
+  const decision = validatePinChange(existingUsers, userId, newPin);
+  if (decision.outcome === "notFound") return { outcome: "notFound" };
+  if (decision.outcome === "invalidPin") return { outcome: "invalidPin" };
+
+  const outcome = await updateUserPin(decision.userId, decision.pin);
+  if (outcome.outcome === "duplicatePin") return { outcome: "duplicatePin" };
+  if (outcome.outcome === "notFound") return { outcome: "notFound" };
+
+  revalidatePath("/usuarios");
+
+  if (admin.user.id === userId) {
+    (await cookies()).delete(SESSION_COOKIE_NAME);
+    redirect("/ingresar");
+  }
+
+  return { outcome: "ok" };
+}
+
+export type GrantAdminResult = { outcome: "ok" } | { outcome: "notFound" } | { outcome: "forbidden" };
+
+// Makes a User an Admin (ticket #14, Admin-only): always allowed for a known User
+// (validateGrantAdmin, src/domain/access/grant-admin.ts), since granting can never leave the
+// Household without one. Runs inside withAdminGuardLock for the same reason removeUser does (see
+// that function's own comment): a grant racing a demotion or removal must never interleave with
+// either. Unlike changePin, this never touches Sessions (see CONTEXT.md — only Change PIN and
+// removal end them).
+export async function grantAdmin(userId: string): Promise<GrantAdminResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+  if (!isValidId(userId)) return { outcome: "notFound" };
+
+  const result = await withAdminGuardLock(async (tx) => {
+    const existingUsers = await listUsers(tx);
+    const decision = validateGrantAdmin(existingUsers, userId);
+    if (decision.outcome === "notFound") return { outcome: "notFound" } as const;
+
+    const updated = await setUserAdmin(userId, true, tx);
+    if (!updated) return { outcome: "notFound" } as const;
+    return { outcome: "ok" } as const;
+  });
+
+  if (result.outcome === "ok") revalidatePath("/usuarios");
+  return result;
+}
+
+export type RevokeAdminResult =
+  | { outcome: "ok" }
+  | { outcome: "notFound" }
+  | { outcome: "lastAdmin" }
+  | { outcome: "forbidden" };
+
+// Removes the Admin role from a User (ticket #14, Admin-only): refused when the target is the
+// Household's only Admin (validateRevokeAdmin, src/domain/access/revoke-admin.ts), the same
+// invariant removeUser enforces for deletion. The read (listUsers), the decision and the write
+// (setUserAdmin) all run inside withAdminGuardLock's transaction-scoped advisory lock for exactly
+// the reason documented on that helper (src/db/users.ts): a demotion racing a removal, or two
+// demotions racing each other, is the same "zero Admins" failure as two concurrent removals.
+export async function revokeAdmin(userId: string): Promise<RevokeAdminResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+  if (!isValidId(userId)) return { outcome: "notFound" };
+
+  const result = await withAdminGuardLock(async (tx) => {
+    const existingUsers = await listUsers(tx);
+    const decision = validateRevokeAdmin(existingUsers, userId);
+    if (decision.outcome === "notFound") return { outcome: "notFound" } as const;
+    if (decision.outcome === "lastAdmin") return { outcome: "lastAdmin" } as const;
+
+    const updated = await setUserAdmin(userId, false, tx);
+    if (!updated) return { outcome: "notFound" } as const;
     return { outcome: "ok" } as const;
   });
 
