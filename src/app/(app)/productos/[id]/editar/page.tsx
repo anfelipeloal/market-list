@@ -4,6 +4,8 @@ import { listCategories } from "@/db/categories";
 import { findProductById } from "@/db/products";
 import { sortByName } from "@/domain/catalog/names";
 import { requireUser } from "@/lib/session";
+import { PRODUCT_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
+import { DeleteProductButton } from "./delete-product-button";
 import { EditProductForm } from "./edit-product-form";
 
 export const metadata: Metadata = {
@@ -12,7 +14,9 @@ export const metadata: Metadata = {
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   // requireUser() reads the session cookie, which makes this route dynamic (see src/app/page.tsx).
-  await requireUser();
+  // isAdmin decides whether DeleteProductButton (ticket #15) shows itself at all — a courtesy
+  // only, deleteProduct's own requireAdmin() call is the real enforcement.
+  const user = await requireUser();
   const { id } = await params;
   const [product, categories] = await Promise.all([findProductById(id), listCategories()]);
 
@@ -31,9 +35,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             categoryId={product.categoryId}
             categories={sortByName(categories)}
           />
+          <DeleteProductButton productId={product.id} productName={product.name} isAdmin={user.isAdmin} />
         </>
       ) : (
-        <p className="mt-6 text-muted-foreground">No encontramos ese producto.</p>
+        <p className="mt-6 text-muted-foreground">{PRODUCT_NOT_FOUND_MESSAGE}</p>
       )}
     </main>
   );

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  deleteCategory as deleteCategoryRow,
   findCategoryByNormalizedName,
   insertCategory,
   listCategories,
@@ -10,6 +11,7 @@ import {
 } from "@/db/categories";
 import { writeUniqueOrDuplicate } from "@/db/pg-errors";
 import {
+  deleteProduct as deleteProductRow,
   findProductWithCategoryByNormalizedName,
   insertProduct,
   listProducts,
@@ -17,11 +19,14 @@ import {
 } from "@/db/products";
 import { validateNewCategory } from "@/domain/catalog/create-category";
 import { validateNewProduct } from "@/domain/catalog/create-product";
+import { validateCategoryDeletion } from "@/domain/catalog/delete-category";
+import { validateProductDeletion } from "@/domain/catalog/delete-product";
 import { validateProductMove } from "@/domain/catalog/move-product";
 import { validateCategoryRename } from "@/domain/catalog/rename-category";
 import { validateProductRename } from "@/domain/catalog/rename-product";
 import type { ProductStatus } from "@/domain/shopping/status";
-import { requireUser } from "@/lib/session";
+import { requireAdmin, requireUser } from "@/lib/session";
+import { CATEGORY_NOT_FOUND_MESSAGE, PRODUCT_NOT_FOUND_MESSAGE } from "./catalog-messages";
 
 export type CreateCategoryState = { error: string } | undefined;
 
@@ -135,9 +140,9 @@ export async function editCategory(_prevState: EditCategoryState, formData: Form
   const result = validateCategoryRename(categoryId, rawName, existingCategories);
 
   if (result.outcome === "notFound") {
-    // The id comes from the edit page's own URL, so this only fires if the Category was removed
-    // (out of scope, ticket #15) or the request was tampered with.
-    return { error: "No encontramos esa categoría." };
+    // The id comes from the edit page's own URL, so this only fires if the Category was deleted
+    // (ticket #15) by another Admin in the meantime or the request was tampered with.
+    return { error: CATEGORY_NOT_FOUND_MESSAGE };
   }
   if (result.outcome === "empty") {
     return { error: "Escribe un nombre." };
@@ -176,7 +181,7 @@ export async function editProduct(_prevState: EditProductState, formData: FormDa
 
   const renameResult = validateProductRename(productId, rawName, existingProducts, existingCategories);
   if (renameResult.outcome === "notFound") {
-    return { error: "No encontramos ese producto." };
+    return { error: PRODUCT_NOT_FOUND_MESSAGE };
   }
   if (renameResult.outcome === "empty") {
     return { error: "Escribe un nombre." };
@@ -187,7 +192,7 @@ export async function editProduct(_prevState: EditProductState, formData: FormDa
 
   const moveResult = validateProductMove(productId, categoryId, existingProducts, existingCategories);
   if (moveResult.outcome === "productNotFound") {
-    return { error: "No encontramos ese producto." };
+    return { error: PRODUCT_NOT_FOUND_MESSAGE };
   }
   if (moveResult.outcome === "categoryNotFound") {
     // Not one of the Spanish messages the ticket specifies: the Category comes from a <select>
@@ -209,4 +214,64 @@ export async function editProduct(_prevState: EditProductState, formData: FormDa
   revalidatePath("/");
   revalidatePath("/lista");
   redirect("/");
+}
+
+export type DeleteCategoryResult =
+  | { outcome: "ok" }
+  | { outcome: "hasProducts" }
+  | { outcome: "notFound" }
+  | { outcome: "forbidden" };
+
+// Deletes a Category (ticket #15, Admin-only): refused when it still has any Product, whatever
+// that Product's status (validateCategoryDeletion, src/domain/catalog/delete-category.ts), so a
+// Category's Products are never deleted along with it (see CONTEXT.md). requireAdmin() is the
+// actual enforcement — the delete control on the edit page
+// (categorias/[id]/editar/delete-category-button.tsx) only hides itself from a non-Admin as a
+// courtesy, exactly like resetShoppingList (src/app/(app)/shopping-actions.ts) and removeUser
+// (src/app/(app)/usuarios/actions.ts), both of which this mirrors: called directly from the
+// confirmation dialog, not through a form.
+export async function deleteCategory(categoryId: string): Promise<DeleteCategoryResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+
+  const [existingCategories, existingProducts] = await Promise.all([listCategories(), listProducts()]);
+  const decision = validateCategoryDeletion(categoryId, existingCategories, existingProducts);
+  if (decision.outcome === "notFound") return { outcome: "notFound" };
+  if (decision.outcome === "hasProducts") return { outcome: "hasProducts" };
+
+  // The domain check above already read the existing Products, but a concurrent create-Product
+  // could still land in this Category since; the "on delete restrict" foreign key is the final
+  // guard (see src/db/categories.ts#deleteCategory and src/db/pg-errors.ts#isForeignKeyViolation).
+  const outcome = await deleteCategoryRow(decision.category.id);
+  if (outcome.outcome === "hasProducts") return { outcome: "hasProducts" };
+  if (outcome.outcome === "notFound") return { outcome: "notFound" };
+
+  revalidatePath("/");
+  return { outcome: "ok" };
+}
+
+export type DeleteProductResult = { outcome: "ok" } | { outcome: "notFound" } | { outcome: "forbidden" };
+
+// Deletes a Product (ticket #15, Admin-only): removes it wherever it currently is — Pantry or
+// Shopping List, whether In Cart or not (see CONTEXT.md) — with no other rule to check
+// (validateProductDeletion, src/domain/catalog/delete-product.ts). requireAdmin() is the actual
+// enforcement, the same as deleteCategory above. Called directly from the confirmation dialog on
+// the edit page (productos/[id]/editar/delete-product-button.tsx), not through a form.
+export async function deleteProduct(productId: string): Promise<DeleteProductResult> {
+  const admin = await requireAdmin();
+  if (admin.outcome === "forbidden") return { outcome: "forbidden" };
+
+  const existingProducts = await listProducts();
+  const decision = validateProductDeletion(productId, existingProducts);
+  if (decision.outcome === "notFound") return { outcome: "notFound" };
+
+  const outcome = await deleteProductRow(decision.product.id);
+  if (outcome.outcome === "notFound") return { outcome: "notFound" };
+
+  // A deleted Product may have been on the Shopping List, so that screen is revalidated too, not
+  // just the Despensa — the same pair every Shopping transition revalidates (see
+  // src/app/(app)/shopping-actions.ts).
+  revalidatePath("/");
+  revalidatePath("/lista");
+  return { outcome: "ok" };
 }

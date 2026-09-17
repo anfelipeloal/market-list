@@ -86,6 +86,20 @@ export async function updateProductNameAndCategory(
   return product;
 }
 
+export type DeleteProductResult = { outcome: "deleted" } | { outcome: "notFound" };
+
+// Deletes a Product (ticket #15, Admin-only — enforced by src/lib/session.ts#requireAdmin before
+// this is ever called): removes it wherever it currently is (Pantry, Shopping List or In Cart —
+// CONTEXT.md), with no other rule to enforce (unlike deleteCategory in src/db/categories.ts). The
+// same delete-by-id shape as deleteUser (src/db/users.ts): an unknown or malformed id is reported
+// as "notFound" via a null RETURNING result rather than a database error.
+export async function deleteProduct(id: string): Promise<DeleteProductResult> {
+  if (!isValidId(id)) return { outcome: "notFound" };
+
+  const [deleted] = await db.delete(products).where(eq(products.id, id)).returning({ id: products.id });
+  return deleted ? { outcome: "deleted" } : { outcome: "notFound" };
+}
+
 export type ApplyProductTransitionResult =
   | { outcome: "moved"; product: ProductRow }
   | { outcome: "stale" }

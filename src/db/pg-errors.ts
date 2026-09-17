@@ -4,24 +4,42 @@ import postgres from "postgres";
 
 // https://www.postgresql.org/docs/current/errcodes-appendix.html
 const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
+
+// Drizzle never lets the driver's own error surface directly: a failed query is wrapped in its own
+// DrizzleQueryError, with the real postgres.PostgresError attached as `.cause` (see
+// drizzle-orm/errors.js). Checking `error` alone (as isUniqueViolation used to) never matched,
+// silently rethrowing every constraint violation instead of handling it. Unwrapping `.cause` one
+// level is enough: DrizzleQueryError never nests further. Shared by every Postgres-error-code check
+// below so the unwrapping itself is written once.
+function unwrapPostgresError(error: unknown): unknown {
+  return error instanceof Error && error.cause instanceof Error ? error.cause : error;
+}
 
 // True when `error` is a Postgres unique constraint violation. Query modules that insert a
 // Category or Product name rely on this as the final race guard: the domain core already checked
 // for a duplicate against the rows it read, but a concurrent insert can still win the same name
 // between that read and this insert, so the unique constraint is what actually prevents two rows
-// with the same normalized name (see src/app/actions.ts).
-//
-// Drizzle never lets the driver's own error surface directly: a failed query is wrapped in its own
-// DrizzleQueryError, with the real postgres.PostgresError attached as `.cause` (see
-// drizzle-orm/errors.js). Checking `error` alone (as this used to) never matched, silently
-// rethrowing every unique violation instead of handling it — invisible for Category/Product names,
+// with the same normalized name (see src/app/actions.ts). Invisible for Category/Product names,
 // since the domain core's own duplicate check almost always catches those first and this path is
 // only a rarely-hit race guard, but always hit for a duplicate PIN (ticket #13), which the domain
-// core can never check itself (see src/domain/access/create-user.ts). Unwrapping `.cause` one level
-// is enough: DrizzleQueryError never nests further.
+// core can never check itself (see src/domain/access/create-user.ts).
 export function isUniqueViolation(error: unknown): boolean {
-  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  const cause = unwrapPostgresError(error);
   return cause instanceof postgres.PostgresError && cause.code === UNIQUE_VIOLATION;
+}
+
+// True when `error` is a Postgres foreign-key constraint violation. deleteCategory
+// (src/db/categories.ts) relies on this as the final race guard for ticket #15: the domain core
+// (validateCategoryDeletion, src/domain/catalog/delete-category.ts) already checked the Category
+// has no Products against the rows it read, but a concurrent create-Product could still land in
+// that Category between that read and this delete; the products.categoryId "on delete restrict"
+// constraint (src/db/schema.ts) is what actually prevents an orphaned Product, and a violation here
+// is mapped back to the same "hasProducts" refusal the domain core would have returned itself,
+// instead of surfacing as an uncaught error.
+export function isForeignKeyViolation(error: unknown): boolean {
+  const cause = unwrapPostgresError(error);
+  return cause instanceof postgres.PostgresError && cause.code === FOREIGN_KEY_VIOLATION;
 }
 
 export type UniqueWriteResult<TWrite, TExisting> =
