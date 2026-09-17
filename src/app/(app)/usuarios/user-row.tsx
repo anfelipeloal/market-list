@@ -9,12 +9,12 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ConfirmDeleteButton } from "@/app/(app)/confirm-delete-button";
 import { grantAdmin, removeUser, revokeAdmin } from "./actions";
 import { userActionRefusalMessage } from "./messages";
 
@@ -23,31 +23,17 @@ const ROLE_TOAST_ID = "toggle-admin-role";
 
 // One row of the Usuarios list (ticket #13, extended by #14): a link to edit this User (rename,
 // Change PIN), a role toggle ("Hacer administrador" / "Quitar administrador"), and an "Eliminar"
-// button guarded by a confirmation dialog (reusing the AlertDialog added for Reiniciar lista in
-// ticket #12, see src/app/(app)/lista/shopping-list-view.tsx). Every action's own server function
-// (removeUser, grantAdmin, revokeAdmin, all in ./actions.ts) enforces the Admin check — and, for
-// removeUser/revokeAdmin, the last-Admin guard — server-side regardless of what renders here:
-// "forbidden" is only reachable in practice through a tampered/replayed request, since a non-Admin
-// never sees this screen at all.
+// button (ConfirmDeleteButton, src/app/(app)/confirm-delete-button.tsx — shared with ticket #15's
+// Category/Product delete buttons). Every action's own server function (removeUser, grantAdmin,
+// revokeAdmin, all in ./actions.ts) enforces the Admin check — and, for removeUser/revokeAdmin, the
+// last-Admin guard — server-side regardless of what renders here: "forbidden" is only reachable in
+// practice through a tampered/replayed request, since a non-Admin never sees this screen at all.
 export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (userId: string) => void }) {
-  const [isRemoving, startRemoveTransition] = useTransition();
   const [isTogglingRole, startRoleTransition] = useTransition();
   // Reflects the role change instantly instead of waiting for a navigation to reflect the
   // server's revalidatePath("/usuarios") — the same layered-local-state pattern as UsersList's
   // hiddenUserIds (see ./users-list.tsx).
   const [isAdmin, setIsAdmin] = useState(user.isAdmin);
-
-  const handleRemove = () => {
-    startRemoveTransition(async () => {
-      const result = await removeUser(user.id);
-
-      if (result.outcome === "ok") {
-        onRemoved(user.id);
-        return;
-      }
-      toast(userActionRefusalMessage(result.outcome), { id: REMOVE_TOAST_ID });
-    });
-  };
 
   // Hacer administrador (ticket #14): always allowed for a known User (grantAdmin never threatens
   // the last-Admin invariant, see src/domain/access/grant-admin.ts), so it submits directly with no
@@ -124,26 +110,15 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
           </button>
         )}
 
-        <AlertDialog>
-          <AlertDialogTrigger
-            disabled={isRemoving}
-            className="rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive disabled:opacity-50"
-          >
-            Eliminar
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>¿Eliminar a {user.name}?</AlertDialogTitle>
-              <AlertDialogDescription>{user.name} perderá acceso a la aplicación de inmediato.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isRemoving}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" disabled={isRemoving} onClick={handleRemove}>
-                Eliminar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDeleteButton
+          title={`¿Eliminar a ${user.name}?`}
+          description={`${user.name} perderá acceso a la aplicación de inmediato.`}
+          triggerClassName="rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive disabled:opacity-50"
+          toastId={REMOVE_TOAST_ID}
+          action={() => removeUser(user.id)}
+          refusalMessage={userActionRefusalMessage}
+          onSuccess={() => onRemoved(user.id)}
+        />
       </div>
     </li>
   );
