@@ -15,7 +15,8 @@ export const CATEGORY_NOT_FOUND_MESSAGE = "No encontramos esa categoría.";
 
 // Shown whenever a Product id given to an action no longer matches any row (editProduct's rename,
 // deleteProduct's deletion — both in ./actions.ts — and productos/[id]/editar/page.tsx's own
-// fallback).
+// fallback), and reused by shoppingResultMessage (./shopping-messages.ts) for the same wording
+// when a Shopping transition's own Product id misses.
 export const PRODUCT_NOT_FOUND_MESSAGE = "No encontramos ese producto.";
 
 const CATEGORY_HAS_PRODUCTS_MESSAGE = "No puedes eliminar una categoría que tiene productos.";
