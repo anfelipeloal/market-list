@@ -80,3 +80,7 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
 
 - Every table enables Row Level Security with no policies, so Supabase's public key can read or write nothing. Only the Next.js server, with a privileged connection, touches data.
 - Schema changes go through Drizzle migrations in `drizzle/`; never edit the database by hand.
+
+## Known limitations
+
+- The offline service worker (`public/sw.js`, ticket #17) behaves differently under `npm run dev` than it's expected to in production. Under `next dev`, a hard reload of `/lista` while offline is served correctly from the worker's cache at the HTTP level, but React does not hydrate on that response (most likely Turbopack's dev/HMR client blocking client bootstrap while its WebSocket can't connect — there is no such client in a production build). Before shipping a change to the offline behaviour, check against a production build (`next build && next start`) that: the "Sin conexión..." banner appears immediately on a cold offline reload of `/lista` (not only once already-hydrated and then disconnected), and that tapping a Product still shows the Spanish refusal instead of doing nothing.

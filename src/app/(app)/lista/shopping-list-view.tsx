@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { attemptMutation, OFFLINE_MUTATION_MESSAGE } from "../offline-mutation";
+import { attemptMutation, OFFLINE_MUTATION_MESSAGE, type MutationAttempt } from "../offline-mutation";
 import { RefreshIndicator } from "../refresh-indicator";
 import { finishTrip, resetShoppingList, toggleInCart, undoFinishTrip } from "../shopping-actions";
 import { shoppingResultMessage } from "../shopping-messages";
@@ -65,6 +65,20 @@ function finishTripMessage(count: number): string {
     : `Compra terminada: ${count} productos volvieron a la despensa.`;
 }
 
+// Every mutation call site below follows the same shape: run attemptMutation, and if it came back
+// "offline", show the refusal toast and stop there -- otherwise keep going with the actual result.
+// One helper for that instead of the same three lines repeated at each of the four call sites
+// (code review, ticket #17). Returns undefined exactly when it already showed the toast, which is
+// always the caller's cue to return; none of the four actions' own result types can be undefined,
+// so that's an unambiguous signal.
+function unwrapOrShowOffline<T>(attempt: MutationAttempt<T>, toastId?: string): T | undefined {
+  if (attempt.outcome === "offline") {
+    toast(OFFLINE_MUTATION_MESSAGE, toastId ? { id: toastId } : undefined);
+    return undefined;
+  }
+  return attempt.value;
+}
+
 // Owns the Lista de compras' two interactive behaviours (ticket #10): tapping a row toggles a
 // Product In Cart, and "Terminar compra" runs Finish Trip. Server truth is the source of record —
 // a page refresh always reflects it exactly, driven by src/app/(app)/lista/page.tsx re-rendering
@@ -122,6 +136,17 @@ export function ShoppingListView({
   // the mutation-refusal decision (src/domain/offline/mutation-refusal.ts) -- see use-is-offline.ts.
   const isOffline = useIsOffline();
 
+  // Hands off from the service worker's own static offline banner (public/sw.js) to this one
+  // (code review, ticket #17): when the worker itself served this page from its cache -- the only
+  // time that marker exists at all -- it injects an identical-looking banner directly into the raw
+  // HTML, since the real one below is React state that can't show anything before this component
+  // has actually mounted. Once it has (this effect), that job is this component's alone; removing
+  // the marker here, unconditionally, on every mount, is what guarantees the two can never both be
+  // showing at once, regardless of exactly how hydration reconciled the extra DOM node.
+  useEffect(() => {
+    document.querySelector("[data-mercado-sw-banner]")?.remove();
+  }, []);
+
   const visibleShoppingList = useMemo(() => {
     const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
     const products = shoppingList.flatMap((category) =>
@@ -154,11 +179,8 @@ export function ShoppingListView({
   const handleToggle = useCallback(
     async (productId: string, currentlyInCart: boolean) => {
       const attempt = await attemptMutation(() => toggleInCart(productId));
-      if (attempt.outcome === "offline") {
-        toast(OFFLINE_MUTATION_MESSAGE);
-        return;
-      }
-      const result = attempt.value;
+      const result = unwrapOrShowOffline(attempt);
+      if (result === undefined) return;
       if (result.outcome !== "ok") {
         toast(shoppingResultMessage(result.outcome));
         return;
@@ -178,11 +200,8 @@ export function ShoppingListView({
 
     const attempt = await attemptMutation(() => undoFinishTrip(affectedIds));
     undoInFlight.current = false;
-    if (attempt.outcome === "offline") {
-      toast(OFFLINE_MUTATION_MESSAGE);
-      return;
-    }
-    const result = attempt.value;
+    const result = unwrapOrShowOffline(attempt);
+    if (result === undefined) return;
     if (result.outcome !== "ok") {
       toast(FINISH_TRIP_STALE_MESSAGE);
       return;
@@ -223,11 +242,8 @@ export function ShoppingListView({
   const handleFinishTrip = useCallback(() => {
     startFinishTripTransition(async () => {
       const attempt = await attemptMutation(() => finishTrip());
-      if (attempt.outcome === "offline") {
-        toast(OFFLINE_MUTATION_MESSAGE);
-        return;
-      }
-      const result = attempt.value;
+      const result = unwrapOrShowOffline(attempt);
+      if (result === undefined) return;
       if (result.outcome === "empty") {
         toast(FINISH_TRIP_EMPTY_MESSAGE);
         return;
@@ -262,11 +278,8 @@ export function ShoppingListView({
       const attempt = await attemptMutation(() => resetShoppingList());
       setResetDialogOpen(false);
 
-      if (attempt.outcome === "offline") {
-        toast(OFFLINE_MUTATION_MESSAGE, { id: RESET_TOAST_ID });
-        return;
-      }
-      const result = attempt.value;
+      const result = unwrapOrShowOffline(attempt, RESET_TOAST_ID);
+      if (result === undefined) return;
 
       if (result.outcome === "forbidden") {
         toast(RESET_FORBIDDEN_MESSAGE, { id: RESET_TOAST_ID });
