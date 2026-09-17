@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { findCategoryById } from "@/db/categories";
 import { requireUser } from "@/lib/session";
+import { CATEGORY_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
+import { DeleteCategoryButton } from "./delete-category-button";
 import { EditCategoryForm } from "./edit-category-form";
 
 export const metadata: Metadata = {
@@ -10,7 +12,9 @@ export const metadata: Metadata = {
 
 export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
   // requireUser() reads the session cookie, which makes this route dynamic (see src/app/page.tsx).
-  await requireUser();
+  // isAdmin decides whether DeleteCategoryButton (ticket #15) shows itself at all — a courtesy
+  // only, deleteCategory's own requireAdmin() call is the real enforcement.
+  const user = await requireUser();
   const { id } = await params;
   const category = await findCategoryById(id);
 
@@ -24,9 +28,10 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
         <>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Editar categoría</h1>
           <EditCategoryForm categoryId={category.id} currentName={category.name} />
+          <DeleteCategoryButton categoryId={category.id} categoryName={category.name} isAdmin={user.isAdmin} />
         </>
       ) : (
-        <p className="mt-6 text-muted-foreground">No encontramos esa categoría.</p>
+        <p className="mt-6 text-muted-foreground">{CATEGORY_NOT_FOUND_MESSAGE}</p>
       )}
     </main>
   );
