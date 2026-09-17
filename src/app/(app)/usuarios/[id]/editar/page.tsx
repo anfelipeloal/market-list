@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { findUserById } from "@/db/users";
 import { requireAdmin } from "@/lib/session";
+import { ADMIN_ONLY_MESSAGE } from "@/app/(app)/usuarios/messages";
 import { EditUserForm } from "./edit-user-form";
 
 export const metadata: Metadata = {
@@ -18,7 +19,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
   if (admin.outcome === "forbidden") {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <p className="mt-6 text-muted-foreground">Solo un administrador puede administrar usuarios.</p>
+        <p className="mt-6 text-muted-foreground">{ADMIN_ONLY_MESSAGE}</p>
       </main>
     );
   }

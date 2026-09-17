@@ -16,9 +16,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { removeUser } from "./actions";
+import { ADMIN_ONLY_MESSAGE } from "./messages";
 
 const REMOVE_TOAST_ID = "remove-user";
-const FORBIDDEN_MESSAGE = "Solo un administrador puede administrar usuarios.";
 const LAST_ADMIN_MESSAGE = "Debe quedar al menos un administrador.";
 const NOT_FOUND_MESSAGE = "No encontramos ese usuario.";
 
@@ -40,7 +40,7 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
         return;
       }
       if (result.outcome === "forbidden") {
-        toast(FORBIDDEN_MESSAGE, { id: REMOVE_TOAST_ID });
+        toast(ADMIN_ONLY_MESSAGE, { id: REMOVE_TOAST_ID });
         return;
       }
       if (result.outcome === "lastAdmin") {

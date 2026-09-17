@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { listUsers } from "@/db/users";
 import { sortByName } from "@/domain/catalog/names";
 import { requireAdmin } from "@/lib/session";
+import { ADMIN_ONLY_MESSAGE } from "./messages";
 import { NewUserForm } from "./new-user-form";
 import { UsersList } from "./users-list";
 
@@ -22,7 +23,7 @@ export default async function UsersPage() {
     return (
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
         <h1 className="text-2xl font-semibold tracking-tight">Usuarios</h1>
-        <p className="mt-6 text-muted-foreground">Solo un administrador puede administrar usuarios.</p>
+        <p className="mt-6 text-muted-foreground">{ADMIN_ONLY_MESSAGE}</p>
       </main>
     );
   }
