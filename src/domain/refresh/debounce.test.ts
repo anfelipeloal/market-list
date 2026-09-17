@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTriggerRefresh, REFRESH_MIN_INTERVAL_MS } from "./refresh-debounce";
+import { canTriggerRefresh, REFRESH_MIN_INTERVAL_MS } from "./debounce";
 
 const T0 = new Date("2026-01-01T00:00:00.000Z").getTime();
 
