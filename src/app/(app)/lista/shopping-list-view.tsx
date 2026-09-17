@@ -2,8 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { RefreshIndicator } from "../refresh-indicator";
 import { finishTrip, resetShoppingList, toggleInCart, undoFinishTrip } from "../shopping-actions";
 import { shoppingResultMessage } from "../shopping-messages";
+import { useRefreshOnReturn } from "../use-refresh-on-return";
 import { buildShoppingListView, type ShoppingListCategory } from "@/domain/shopping/shopping-list";
 import { buildShoppingListMarkdown } from "@/domain/shopping/shopping-list-markdown";
 import {
@@ -97,6 +99,20 @@ export function ShoppingListView({
   // enough (unlike pantry-search's per-Product Set).
   const undoInFlight = useRef(false);
   const copyInFlight = useRef(false);
+
+  // Refresh on return and pull-to-refresh (ticket #16): same mechanism and the same reasoning as
+  // pantry-search.tsx's own use of useRefreshOnReturn, applied to this screen's two local
+  // overrides instead of one. Once the fresh `shoppingList` prop has actually landed, both are
+  // cleared: a stale inCartOverrides entry could otherwise show a Product as In Cart (or not) a
+  // moment after someone else genuinely changed it back, and a stale hiddenProductIds entry (from
+  // this session's own earlier Finish Trip or Reset) could keep hiding a Product that legitimately
+  // returned to the Shopping List under the same id before this refresh. Clearing here is safe
+  // because it always runs after the new data replaces the old, never before.
+  const handleRefreshed = useCallback(() => {
+    setInCartOverrides(new Map());
+    setHiddenProductIds(new Set());
+  }, []);
+  const { containerRef, isRefreshing, pull } = useRefreshOnReturn(handleRefreshed);
 
   const visibleShoppingList = useMemo(() => {
     const categories = shoppingList.map((category) => ({ id: category.id, name: category.name }));
@@ -236,7 +252,8 @@ export function ShoppingListView({
   }, [shoppingList]);
 
   return (
-    <>
+    <div ref={containerRef}>
+      <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
       {visibleShoppingList.length === 0 ? (
         <p className="mt-6 text-muted-foreground">La lista de compras está vacía.</p>
       ) : (
@@ -315,6 +332,6 @@ export function ShoppingListView({
           </AlertDialog>
         )}
       </div>
-    </>
+    </div>
   );
 }
