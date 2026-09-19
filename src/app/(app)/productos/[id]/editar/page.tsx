@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import { ArrowLeftIcon } from "lucide-react";
 import { listCategories } from "@/db/categories";
 import { findProductById } from "@/db/products";
 import { sortByName } from "@/domain/catalog/names";
 import { requireUser } from "@/lib/session";
 import { PRODUCT_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
-import { IconLink } from "@/app/(app)/icon-control";
+import { EditPageHeader } from "@/app/(app)/edit-page-header";
 import { DeleteProductButton } from "./delete-product-button";
 import { EditProductForm } from "./edit-product-form";
 
@@ -23,7 +22,15 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <IconLink href="/" icon={ArrowLeftIcon} label="Volver a la Despensa" className="-ml-3" />
+      <EditPageHeader
+        backHref="/"
+        backLabel="Volver a la Despensa"
+        trailing={
+          product ? (
+            <DeleteProductButton productId={product.id} productName={product.name} isAdmin={user.isAdmin} />
+          ) : null
+        }
+      />
 
       {product ? (
         <>
@@ -34,7 +41,6 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
             categoryId={product.categoryId}
             categories={sortByName(categories)}
           />
-          <DeleteProductButton productId={product.id} productName={product.name} isAdmin={user.isAdmin} />
         </>
       ) : (
         <p className="mt-6 text-muted-foreground">{PRODUCT_NOT_FOUND_MESSAGE}</p>
