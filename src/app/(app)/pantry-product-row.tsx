@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useTransition } from "react";
+import { PencilIcon } from "lucide-react";
+import { IconLink } from "./icon-control";
 
 // Explains what checking a Despensa Product does; rendered once by pantry-search.tsx and
 // referenced by every row, since a checkbox alone only announces "not checked".
@@ -37,12 +38,11 @@ export function PantryProductRow({
         />
         <span className="min-w-0 truncate">{product.name}</span>
       </label>
-      <Link
+      <IconLink
         href={`/productos/${product.id}/editar`}
-        className="shrink-0 px-2 py-3 text-sm text-muted-foreground underline"
-      >
-        Editar
-      </Link>
+        icon={PencilIcon}
+        label={`Editar ${product.name}`}
+      />
     </li>
   );
 }

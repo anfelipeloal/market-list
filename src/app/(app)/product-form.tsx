@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { PlusIcon } from "lucide-react";
 import { createProduct, type CreateProductState } from "./actions";
 import { CreateNameForm } from "./create-name-form";
 
@@ -29,8 +30,10 @@ export function ProductForm({
       action={createProduct}
       label={`Nuevo producto en ${categoryName}`}
       placeholder="Nuevo producto"
+      submitLabel={`Agregar producto a ${categoryName}`}
+      submitIcon={PlusIcon}
       formClassName="flex flex-col gap-2 px-4 py-3"
-      buttonClassName="shrink-0 rounded-lg bg-secondary px-4 py-3 text-base font-medium text-secondary-foreground disabled:opacity-50"
+      buttonClassName="bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)]"
       hiddenFields={{ categoryId }}
       getError={(state) => (state?.kind === "error" ? state.error : undefined)}
       renderExtra={(state) => {

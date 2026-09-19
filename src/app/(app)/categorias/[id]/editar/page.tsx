@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ArrowLeftIcon } from "lucide-react";
 import { findCategoryById } from "@/db/categories";
 import { requireUser } from "@/lib/session";
 import { CATEGORY_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
+import { IconLink } from "@/app/(app)/icon-control";
 import { DeleteCategoryButton } from "./delete-category-button";
 import { EditCategoryForm } from "./edit-category-form";
 
@@ -20,9 +21,7 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <Link href="/" className="text-sm text-muted-foreground underline">
-        Volver a la Despensa
-      </Link>
+      <IconLink href="/" icon={ArrowLeftIcon} label="Volver a la Despensa" className="-ml-3" />
 
       {category ? (
         <>

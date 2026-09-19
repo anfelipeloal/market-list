@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ArrowLeftIcon } from "lucide-react";
 import { listCategories } from "@/db/categories";
 import { findProductById } from "@/db/products";
 import { sortByName } from "@/domain/catalog/names";
 import { requireUser } from "@/lib/session";
 import { PRODUCT_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
+import { IconLink } from "@/app/(app)/icon-control";
 import { DeleteProductButton } from "./delete-product-button";
 import { EditProductForm } from "./edit-product-form";
 
@@ -22,9 +23,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <Link href="/" className="text-sm text-muted-foreground underline">
-        Volver a la Despensa
-      </Link>
+      <IconLink href="/" icon={ArrowLeftIcon} label="Volver a la Despensa" className="-ml-3" />
 
       {product ? (
         <>

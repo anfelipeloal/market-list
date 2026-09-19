@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { ArrowLeftIcon } from "lucide-react";
 import { findUserById } from "@/db/users";
 import { requireAdmin } from "@/lib/session";
 import { ADMIN_ONLY_MESSAGE, USER_NOT_FOUND_MESSAGE } from "@/app/(app)/usuarios/messages";
+import { IconLink } from "@/app/(app)/icon-control";
 import { ChangePinForm } from "./change-pin-form";
 import { EditUserForm } from "./edit-user-form";
 
@@ -34,9 +35,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ id: s
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <Link href="/usuarios" className="text-sm text-muted-foreground underline">
-        Volver a Usuarios
-      </Link>
+      <IconLink href="/usuarios" icon={ArrowLeftIcon} label="Volver a Usuarios" className="-ml-3" />
 
       {user ? (
         <>

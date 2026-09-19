@@ -30,11 +30,11 @@ export function DeleteCategoryButton({
   if (!isAdmin) return null;
 
   return (
-    <div className="mt-6 rounded-xl border border-destructive/40 bg-card p-4">
+    <div className="mt-6 flex justify-center rounded-xl border border-destructive/40 bg-card p-4">
       <ConfirmDeleteButton
+        label={`Eliminar ${categoryName}`}
         title={`¿Eliminar ${categoryName}?`}
         description="Esta acción no se puede deshacer."
-        triggerClassName="w-full rounded-lg border border-destructive/40 px-4 py-3 text-base font-medium text-destructive disabled:opacity-50"
         toastId={DELETE_TOAST_ID}
         action={() => deleteCategory(categoryId)}
         refusalMessage={deleteCategoryRefusalMessage}

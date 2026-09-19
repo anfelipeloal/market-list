@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useEffect, useId, useRef, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { IconButton } from "./icon-control";
 
 export type CreateNameFormState = { error: string } | undefined;
 
@@ -23,6 +25,7 @@ export function CreateNameForm<TState = CreateNameFormState>({
   placeholder,
   defaultValue,
   submitLabel = "Agregar",
+  submitIcon,
   formClassName,
   buttonClassName,
   hiddenFields,
@@ -37,6 +40,14 @@ export function CreateNameForm<TState = CreateNameFormState>({
   // unset so the input starts empty.
   defaultValue?: string;
   submitLabel?: string;
+  // Opt-in icon-only submit (UI redesign: the inline create forms -- add a Product to a Category,
+  // create a Category -- save space with a plus icon instead of "Agregar"). Omitted, the submit
+  // stays a plain text button reading `submitLabel` -- every edit-page use of this form (rename a
+  // Category/User, ProductForm's own "Guardar") keeps its text this way. Given, `submitLabel`
+  // stops being visible text and becomes the icon's accessible name instead (see
+  // src/app/(app)/icon-control.tsx), so a caller passing this must also pass a `submitLabel`
+  // specific enough to stand alone (e.g. "Agregar producto a Lácteos y huevos", not "Agregar").
+  submitIcon?: LucideIcon;
   formClassName: string;
   buttonClassName: string;
   hiddenFields?: Record<string, string>;
@@ -90,9 +101,19 @@ export function CreateNameForm<TState = CreateNameFormState>({
           aria-describedby={error ? errorId : undefined}
           className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-3 text-base"
         />
-        <button type="submit" disabled={pending} className={buttonClassName}>
-          {submitLabel}
-        </button>
+        {submitIcon ? (
+          <IconButton
+            type="submit"
+            icon={submitIcon}
+            label={submitLabel}
+            disabled={pending}
+            className={buttonClassName}
+          />
+        ) : (
+          <button type="submit" disabled={pending} className={buttonClassName}>
+            {submitLabel}
+          </button>
+        )}
       </div>
       {error ? (
         <p id={errorId} role="alert" className="text-sm text-destructive">

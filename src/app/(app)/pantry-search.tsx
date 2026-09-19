@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { CategoryForm } from "./category-form";
+import { IconLink } from "./icon-control";
 import { PANTRY_CHECKBOX_HINT_ID, PantryProductRow } from "./pantry-product-row";
 import { ProductForm } from "./product-form";
 import { RefreshIndicator } from "./refresh-indicator";
@@ -163,9 +164,11 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
             <li key={category.id} className="overflow-hidden rounded-xl border bg-card">
               <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
                 <h2 className="text-lg font-semibold">{category.name}</h2>
-                <Link href={`/categorias/${category.id}/editar`} className="text-sm text-muted-foreground underline">
-                  Editar
-                </Link>
+                <IconLink
+                  href={`/categorias/${category.id}/editar`}
+                  icon={PencilIcon}
+                  label={`Editar ${category.name}`}
+                />
               </div>
 
               {category.products.length > 0 ? (

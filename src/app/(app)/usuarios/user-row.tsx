@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
+import { PencilIcon, ShieldMinusIcon, ShieldPlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import type { SignedInUser } from "@/db/users";
 import {
@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ConfirmDeleteButton } from "@/app/(app)/confirm-delete-button";
+import { IconButton, IconLink } from "@/app/(app)/icon-control";
 import { grantAdmin, removeUser, revokeAdmin } from "./actions";
 import { userActionRefusalMessage } from "./messages";
 
@@ -74,19 +75,15 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
         {isAdmin ? <span className="text-sm text-muted-foreground">Administrador</span> : null}
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-3">
-        <Link href={`/usuarios/${user.id}/editar`} className="text-sm text-muted-foreground underline">
-          Editar
-        </Link>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+        <IconLink href={`/usuarios/${user.id}/editar`} icon={PencilIcon} label={`Editar ${user.name}`} />
 
         {isAdmin ? (
           <AlertDialog>
             <AlertDialogTrigger
               disabled={isTogglingRole}
-              className="text-sm text-muted-foreground underline disabled:opacity-50"
-            >
-              Quitar administrador
-            </AlertDialogTrigger>
+              render={<IconButton icon={ShieldMinusIcon} label={`Quitar administrador a ${user.name}`} />}
+            />
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>¿Quitar administrador a {user.name}?</AlertDialogTitle>
@@ -100,20 +97,18 @@ export function UserRow({ user, onRemoved }: { user: SignedInUser; onRemoved: (u
             </AlertDialogContent>
           </AlertDialog>
         ) : (
-          <button
-            type="button"
+          <IconButton
+            icon={ShieldPlusIcon}
+            label={`Hacer administrador a ${user.name}`}
             disabled={isTogglingRole}
             onClick={handleGrantAdmin}
-            className="text-sm text-muted-foreground underline disabled:opacity-50"
-          >
-            Hacer administrador
-          </button>
+          />
         )}
 
         <ConfirmDeleteButton
+          label={`Eliminar a ${user.name}`}
           title={`¿Eliminar a ${user.name}?`}
           description={`${user.name} perderá acceso a la aplicación de inmediato.`}
-          triggerClassName="rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive disabled:opacity-50"
           toastId={REMOVE_TOAST_ID}
           action={() => removeUser(user.id)}
           refusalMessage={userActionRefusalMessage}
