@@ -17,6 +17,7 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
 ### Prerequisites
 
 - Node.js 24
+- pnpm 11 (the exact version is pinned in `package.json`'s `packageManager`; `corepack enable` installs it)
 - Docker Desktop, running
 
 ### First-time setup
@@ -24,8 +25,10 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
 1. Install dependencies:
 
    ```sh
-   npm install
+   pnpm install
    ```
+
+   Only `esbuild` and `unrs-resolver` are allowed to run install scripts (`allowBuilds` in `pnpm-workspace.yaml`); pnpm refuses any other package's scripts, so a new dependency that needs one must be approved with `pnpm approve-builds <package>`.
 
 2. Create `.env.local` at the repository root with the local database connection strings and the sign-in configuration:
 
@@ -44,33 +47,35 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
 3. Start the local Supabase stack (only Postgres is enabled; the first run downloads the image):
 
    ```sh
-   npm run db:start
+   pnpm db:start
    ```
 
 4. Apply the migrations, which also create the starting Categories:
 
    ```sh
-   npm run db:migrate
+   pnpm db:migrate
    ```
 
 5. Start the app and open http://localhost:3000:
 
    ```sh
-   npm run dev
+   pnpm dev
    ```
 
 ### Everyday commands
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the app |
-| `npm test` | Run the unit tests once |
-| `npm run test:watch` | Run the unit tests in watch mode |
-| `npm run typecheck` | Type-check the project |
-| `npm run lint` | Lint the project |
-| `npm run db:generate -- --name <change>` | Generate a migration after changing `src/db/schema.ts` |
-| `npm run db:migrate` | Apply pending migrations |
-| `npm run db:stop` | Stop the local Supabase stack |
+| `pnpm dev` | Start the app |
+| `pnpm test` | Run the unit tests once |
+| `pnpm test:watch` | Run the unit tests in watch mode |
+| `pnpm typecheck` | Type-check the project |
+| `pnpm lint` | Lint the project |
+| `pnpm db:generate --name <change>` | Generate a migration after changing `src/db/schema.ts` |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:stop` | Stop the local Supabase stack |
+
+Pass extra arguments straight after the script name. Unlike npm, pnpm forwards a `--` separator to the command literally, so `pnpm db:generate -- --name x` fails.
 
 ### Database rules
 
@@ -96,8 +101,9 @@ Set these in Vercel, separately for **Production** (production Supabase project)
 - **Never change `PIN_HASH_SECRET` once anyone has signed in.** Every stored PIN is hashed with it, so a new secret locks out the whole Household.
 - Use the **Session pooler** for `DIRECT_DATABASE_URL`, not the Direct connection: Supabase's direct connection is IPv6-only on the free plan, and Vercel's build machines (like most home networks) are IPv4, so it hangs instead of failing. Never point migrations at the Transaction pooler.
 - Do not set `NODE_ENV` in Vercel: the build needs the development dependencies (`drizzle-kit`) installed.
+- Set `ENABLE_EXPERIMENTAL_COREPACK=1` in Vercel so it installs with the exact pnpm pinned in `packageManager`. The lockfile format (`9.0`) is shared by pnpm 9, 10 and 11, so without it Vercel may pick a different pnpm than the one this project is tested with, and the `allowBuilds` setting in `pnpm-workspace.yaml` was written by pnpm 11.
 - The first sign-in on a new database creates the first Admin. After that, `FIRST_ADMIN_PIN` is never read again and can be removed from Vercel.
 
 ## Known limitations
 
-- The offline service worker (`public/sw.js`, ticket #17) behaves differently under `npm run dev` than it's expected to in production. Under `next dev`, a hard reload of `/lista` while offline is served correctly from the worker's cache at the HTTP level, but React does not hydrate on that response (most likely Turbopack's dev/HMR client blocking client bootstrap while its WebSocket can't connect — there is no such client in a production build). Before shipping a change to the offline behaviour, check against a production build (`next build && next start`) that: the "Sin conexión..." banner appears immediately on a cold offline reload of `/lista` (not only once already-hydrated and then disconnected), and that tapping a Product still shows the Spanish refusal instead of doing nothing.
+- The offline service worker (`public/sw.js`, ticket #17) behaves differently under `pnpm dev` than it's expected to in production. Under `next dev`, a hard reload of `/lista` while offline is served correctly from the worker's cache at the HTTP level, but React does not hydrate on that response (most likely Turbopack's dev/HMR client blocking client bootstrap while its WebSocket can't connect — there is no such client in a production build). Before shipping a change to the offline behaviour, check against a production build (`next build && next start`) that: the "Sin conexión..." banner appears immediately on a cold offline reload of `/lista` (not only once already-hydrated and then disconnected), and that tapping a Product still shows the Spanish refusal instead of doing nothing.
