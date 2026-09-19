@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CategoryForm } from "./category-form";
-import { PantryProductRow } from "./pantry-product-row";
+import { PANTRY_CHECKBOX_HINT_ID, PantryProductRow } from "./pantry-product-row";
 import { ProductForm } from "./product-form";
 import { RefreshIndicator } from "./refresh-indicator";
 import { moveToShoppingList, returnToPantry } from "./shopping-actions";
@@ -132,6 +132,9 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
       <h1 className="text-2xl font-semibold tracking-tight">Despensa</h1>
+      <p id={PANTRY_CHECKBOX_HINT_ID} className="sr-only">
+        Marca un producto para agregarlo a la lista de compras.
+      </p>
       <div className="mt-4">
         <label htmlFor={inputId} className="sr-only">
           Buscar en la despensa
