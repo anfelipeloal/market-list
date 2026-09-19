@@ -99,7 +99,7 @@ export function CreateNameForm<TState = CreateNameFormState>({
           defaultValue={defaultValue}
           required
           aria-describedby={error ? errorId : undefined}
-          className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-3 text-base"
+          className="h-(--control-height) min-w-0 flex-1 rounded-lg border bg-background px-3 text-base"
         />
         {submitIcon ? (
           <IconButton

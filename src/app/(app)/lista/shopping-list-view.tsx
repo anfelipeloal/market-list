@@ -397,7 +397,7 @@ export function ShoppingListView({
           type="button"
           disabled={!hasInCart || isFinishingTrip}
           onClick={handleFinishTrip}
-          className="w-full rounded-lg bg-primary px-4 py-3 text-base font-semibold text-primary-foreground disabled:opacity-50"
+          className="h-(--control-height) w-full rounded-lg bg-primary px-4 text-base font-semibold text-primary-foreground disabled:opacity-50"
         >
           Terminar compra
         </button>

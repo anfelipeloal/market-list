@@ -54,7 +54,7 @@ export function ProductForm({
                     if (moved) setMovedProductId(productId);
                   });
                 }}
-                className="rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                className="h-(--control-height) rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
                 Agregar a la lista de compras
               </button>
