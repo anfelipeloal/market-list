@@ -36,7 +36,7 @@ export function EditProductForm({
           defaultValue={currentName}
           required
           aria-describedby={state?.error ? errorId : undefined}
-          className="rounded-lg border bg-background px-3 py-3 text-base"
+          className="h-(--control-height) rounded-lg border bg-background px-3 text-base"
         />
       </div>
 
@@ -48,7 +48,7 @@ export function EditProductForm({
           id={categoryFieldId}
           name="categoryId"
           defaultValue={categoryId}
-          className="rounded-lg border bg-background px-3 py-3 text-base"
+          className="h-(--control-height) rounded-lg border bg-background px-3 text-base"
         >
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
@@ -67,7 +67,7 @@ export function EditProductForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+        className="h-(--control-height) rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground disabled:opacity-50"
       >
         Guardar
       </button>

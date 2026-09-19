@@ -35,7 +35,7 @@ export function NewUserForm() {
         placeholder="Nombre"
         required
         aria-describedby={state?.error ? errorId : undefined}
-        className="rounded-lg border bg-background px-3 py-3 text-base"
+        className="h-(--control-height) rounded-lg border bg-background px-3 text-base"
       />
 
       <label htmlFor={pinId} className="sr-only">
@@ -52,7 +52,7 @@ export function NewUserForm() {
         placeholder="PIN"
         required
         aria-describedby={state?.error ? errorId : undefined}
-        className="rounded-lg border bg-background px-3 py-3 text-base tracking-[0.3em]"
+        className="h-(--control-height) rounded-lg border bg-background px-3 text-base tracking-[0.3em]"
       />
 
       {state?.error ? (
@@ -64,7 +64,7 @@ export function NewUserForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+        className="h-(--control-height) rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground disabled:opacity-50"
       >
         Guardar
       </button>

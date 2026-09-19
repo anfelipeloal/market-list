@@ -106,7 +106,7 @@ export function ChangePinForm({ userId, isSelf }: { userId: string; isSelf: bool
         value={pin}
         onChange={(event) => setPin(event.target.value)}
         aria-describedby={error ? errorId : undefined}
-        className="rounded-lg border bg-background px-3 py-3 text-base tracking-[0.3em]"
+        className="h-(--control-height) rounded-lg border bg-background px-3 text-base tracking-[0.3em]"
       />
 
       {error ? (
@@ -118,7 +118,7 @@ export function ChangePinForm({ userId, isSelf }: { userId: string; isSelf: bool
       <button
         type="submit"
         disabled={isPending}
-        className="rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+        className="h-(--control-height) rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground disabled:opacity-50"
       >
         Guardar
       </button>

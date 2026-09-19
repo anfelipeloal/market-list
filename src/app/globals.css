@@ -90,6 +90,12 @@
      out of sync with the space reserved for it in those other two places again. */
   --bottom-nav-height: 4rem;
   --bottom-nav-offset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+
+  /* The one height every input, select and button shares, so a field and the button beside it
+     always line up. 2.75rem (44px) is also the minimum comfortable tap target on a phone. Set as
+     a height rather than vertical padding, because padding makes the result depend on each
+     control's font size and border. */
+  --control-height: 2.75rem;
 }
 
 .dark {

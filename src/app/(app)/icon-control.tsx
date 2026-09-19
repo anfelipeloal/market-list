@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 // never drift apart, so every caller passes one `label` string instead of setting each attribute
 // itself. The icon itself is always `aria-hidden`: its meaning is carried entirely by `label`.
 const ICON_CONTROL_CLASSNAME =
-  "inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex size-(--control-height) shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
 
 const ICON_CLASSNAME = "size-5";
 

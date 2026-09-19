@@ -32,7 +32,7 @@ export function PinForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-xl bg-primary px-4 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+        className="h-(--control-height) w-full rounded-xl bg-primary px-4 text-base font-medium text-primary-foreground disabled:opacity-50"
       >
         Entrar
       </button>

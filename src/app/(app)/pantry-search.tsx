@@ -146,7 +146,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
           placeholder="Buscar en la despensa"
-          className="w-full rounded-lg border bg-background px-3 py-3 text-base"
+          className="h-(--control-height) w-full rounded-lg border bg-background px-3 text-base"
         />
         {/* Announces result changes to screen readers, which don't notice the list re-rendering. */}
         <p aria-live="polite" className="sr-only">

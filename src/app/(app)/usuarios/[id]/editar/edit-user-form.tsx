@@ -15,7 +15,7 @@ export function EditUserForm({ userId, currentName }: { userId: string; currentN
       defaultValue={currentName}
       submitLabel="Guardar"
       formClassName="mt-6 flex flex-col gap-2 rounded-xl border bg-card p-4"
-      buttonClassName="shrink-0 rounded-lg bg-primary px-4 py-3 text-base font-medium text-primary-foreground disabled:opacity-50"
+      buttonClassName="h-(--control-height) shrink-0 rounded-lg bg-primary px-4 text-base font-medium text-primary-foreground disabled:opacity-50"
       hiddenFields={{ userId }}
     />
   );
