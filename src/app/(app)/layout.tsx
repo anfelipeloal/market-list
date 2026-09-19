@@ -23,8 +23,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <RegisterServiceWorker />
-      {/* pb-24 keeps content clear of the fixed BottomNav below it. */}
-      <div className="flex flex-1 flex-col pb-24">{children}</div>
+      {/* pb-(--bottom-nav-offset) keeps content clear of the fixed BottomNav below it -- that
+          custom property (see globals.css) is BottomNav's own height plus the device's bottom
+          safe-area inset, the one source of truth it shares with BottomNav itself and with the
+          sticky "Terminar compra" area (src/app/(app)/lista/shopping-list-view.tsx). */}
+      <div className="flex flex-1 flex-col pb-(--bottom-nav-offset)">{children}</div>
       <BottomNav isAdmin={user.isAdmin} />
       <Toaster position="top-center" />
     </>

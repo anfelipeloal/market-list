@@ -25,8 +25,15 @@ export const metadata: Metadata = {
 // Tints the browser/OS chrome -- the standalone app's status bar included, once installed -- to
 // match the app rather than a default white or black (ticket #17). Kept in sync with manifest.ts's
 // theme_color, which is the same value for the same reason (globals.css's --primary).
+//
+// viewportFit: "cover" (UI redesign, no ticket) lets the page extend under the iOS home-indicator
+// area instead of Safari reserving a plain white bar for it: without this, env(safe-area-inset-bottom)
+// resolves to 0 on iOS regardless of the device, and BottomNav's own bottom padding (see
+// bottom-nav.tsx and globals.css's --bottom-nav-offset) would never actually clear the home
+// indicator on a notched/gestural iPhone.
 export const viewport: Viewport = {
   themeColor: "#171717",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
