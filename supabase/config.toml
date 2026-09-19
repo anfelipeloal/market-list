@@ -66,7 +66,7 @@ schema_paths = []
 
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
-# Disabled: schema and seed data are managed by Drizzle migrations and the db:seed script.
+# Disabled: schema and seed data are both managed by Drizzle migrations in drizzle/.
 enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
