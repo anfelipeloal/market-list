@@ -2,13 +2,16 @@
 
 import { useTransition } from "react";
 
-// A Shopping List Product's row: the whole row is a large tappable button that toggles the
-// Product In Cart (ticket #10) — tapping an In Cart row taps it back to still needed, which is
-// its own undo, so no undo notification is shown for this (see shopping-list-view.tsx). In Cart
-// is shown struck through and muted; aria-pressed carries that toggle state to assistive tech, but
-// on its own a screen reader only announces "pressed", not what that means for this Product — so
-// aria-label spells out the same state the strike-through communicates visually ("en el carrito"
-// vs. still on the Lista de compras), read together with aria-pressed's toggle semantics.
+// Explains what a checked box means on the Lista de compras; rendered once by
+// shopping-list-view.tsx and referenced by every row, since a checkbox alone only announces
+// "checked" or "not checked", not that checked means En el carrito.
+export const IN_CART_CHECKBOX_HINT_ID = "in-cart-checkbox-hint";
+
+// A Shopping List Product's row: a checkbox where checked means In Cart (ticket #10). Unchecking
+// it is its own undo, so no undo notification is shown (see shopping-list-view.tsx). The label
+// wraps the whole row for a large tap target, and In Cart rows stay struck through and muted. The
+// box flips immediately while the change is in flight; if the server refuses it, the row falls
+// back to the Product's real state.
 export function ShoppingListProductRow({
   product,
   onToggle,
@@ -17,25 +20,29 @@ export function ShoppingListProductRow({
   onToggle: (productId: string, inCart: boolean) => Promise<void>;
 }) {
   const [pending, startTransition] = useTransition();
+  const checked = pending ? !product.inCart : product.inCart;
 
   return (
     <li>
-      <button
-        type="button"
-        aria-pressed={product.inCart}
-        aria-label={`${product.name}, ${product.inCart ? "en el carrito" : "en la lista de compras"}`}
-        disabled={pending}
-        onClick={() =>
-          startTransition(async () => {
-            await onToggle(product.id, product.inCart);
-          })
-        }
-        className={`block w-full px-4 py-3 text-left text-base disabled:opacity-50 ${
-          product.inCart ? "text-muted-foreground line-through" : ""
+      <label
+        className={`flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-base has-disabled:opacity-50 ${
+          checked ? "text-muted-foreground line-through" : ""
         }`}
       >
-        {product.name}
-      </button>
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={pending}
+          aria-describedby={IN_CART_CHECKBOX_HINT_ID}
+          onChange={() =>
+            startTransition(async () => {
+              await onToggle(product.id, product.inCart);
+            })
+          }
+          className="size-5 shrink-0 cursor-pointer accent-primary"
+        />
+        <span className="min-w-0">{product.name}</span>
+      </label>
     </li>
   );
 }

@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ShoppingListProductRow } from "./shopping-list-product-row";
+import { IN_CART_CHECKBOX_HINT_ID, ShoppingListProductRow } from "./shopping-list-product-row";
 
 const FINISH_TRIP_EMPTY_MESSAGE = "No hay productos en el carrito.";
 const FINISH_TRIP_STALE_MESSAGE = "La lista cambió. Actualiza la página.";
@@ -304,6 +304,9 @@ export function ShoppingListView({
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
       <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
+      <p id={IN_CART_CHECKBOX_HINT_ID} className="sr-only">
+        Marca un producto cuando ya esté en el carrito.
+      </p>
       {/* role="status" announces this to assistive tech the moment it appears, without needing a
           separate aria-live region (ticket #17): offline shows the last cached list, which may no
           longer match what other Users have since changed. */}
