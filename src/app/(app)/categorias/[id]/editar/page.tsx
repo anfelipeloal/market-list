@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { findCategoryById } from "@/db/categories";
 import { requireUser } from "@/lib/session";
 import { CATEGORY_NOT_FOUND_MESSAGE } from "@/app/(app)/catalog-messages";
+import { EditPageHeader } from "@/app/(app)/edit-page-header";
 import { DeleteCategoryButton } from "./delete-category-button";
 import { EditCategoryForm } from "./edit-category-form";
 
@@ -20,15 +20,20 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-      <Link href="/" className="text-sm text-muted-foreground underline">
-        Volver a la Despensa
-      </Link>
+      <EditPageHeader
+        backHref="/"
+        backLabel="Volver a la Despensa"
+        trailing={
+          category ? (
+            <DeleteCategoryButton categoryId={category.id} categoryName={category.name} isAdmin={user.isAdmin} />
+          ) : null
+        }
+      />
 
       {category ? (
         <>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Editar categoría</h1>
           <EditCategoryForm categoryId={category.id} currentName={category.name} />
-          <DeleteCategoryButton categoryId={category.id} categoryName={category.name} isAdmin={user.isAdmin} />
         </>
       ) : (
         <p className="mt-6 text-muted-foreground">{CATEGORY_NOT_FOUND_MESSAGE}</p>

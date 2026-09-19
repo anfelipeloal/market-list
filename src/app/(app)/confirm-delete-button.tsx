@@ -1,7 +1,9 @@
 "use client";
 
 import { useTransition } from "react";
+import { Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { IconButton } from "./icon-control";
 
 // The "Eliminar" trigger + confirmation dialog + refusal-toast flow shared by every
 // delete-with-confirmation control in the app: ticket #15's Category and Product delete buttons
@@ -34,7 +37,16 @@ import {
 // toast (via the caller's own outcome-to-message mapper, e.g. deleteCategoryRefusalMessage or
 // userActionRefusalMessage) with the dialog left open, exactly like every one of these controls
 // already did before this was extracted.
+//
+// The trigger itself is icon-only (UI redesign: delete is a universally-understood, repeated
+// action, no ticket) via IconButton (src/app/(app)/icon-control.tsx), passed as the base-ui
+// AlertDialogTrigger's own `render` target -- exactly like AlertDialogCancel does with the shadcn
+// Button (src/components/ui/alert-dialog.tsx) -- so `label` (the trash icon's Spanish accessible
+// name, e.g. "Eliminar Frutas") replaces the old `triggerClassName`-driven text button. The
+// confirmation dialog's OWN buttons (Cancelar / Eliminar below) keep their text: only the trigger
+// that opens the dialog needed to shrink.
 export function ConfirmDeleteButton<TResult extends { outcome: string }>({
+  label,
   title,
   description,
   triggerClassName,
@@ -43,9 +55,14 @@ export function ConfirmDeleteButton<TResult extends { outcome: string }>({
   onSuccess,
   refusalMessage,
 }: {
+  // The trash icon's accessible name, specific enough to stand alone (e.g. "Eliminar Frutas",
+  // "Eliminar a Ana").
+  label: string;
   title: string;
   description?: string;
-  triggerClassName: string;
+  // Extra classes for the icon trigger's own placement (e.g. centering it in a card); the
+  // destructive-tinted icon look itself is IconButton's default, not something callers set.
+  triggerClassName?: string;
   toastId: string;
   action: () => Promise<TResult>;
   onSuccess: () => void;
@@ -66,9 +83,16 @@ export function ConfirmDeleteButton<TResult extends { outcome: string }>({
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger disabled={isPending} className={triggerClassName}>
-        Eliminar
-      </AlertDialogTrigger>
+      <AlertDialogTrigger
+        disabled={isPending}
+        render={
+          <IconButton
+            icon={Trash2Icon}
+            label={label}
+            className={cn("text-destructive hover:bg-destructive/10", triggerClassName)}
+          />
+        }
+      />
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { CopyIcon, RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { attemptMutation, OFFLINE_MUTATION_MESSAGE, type MutationAttempt } from "../offline-mutation";
+import { IconButton } from "../icon-control";
 import { RefreshIndicator } from "../refresh-indicator";
 import { finishTrip, resetShoppingList, toggleInCart, undoFinishTrip } from "../shopping-actions";
 import { shoppingResultMessage } from "../shopping-messages";
@@ -303,7 +305,58 @@ export function ShoppingListView({
   return (
     <div ref={containerRef}>
       <RefreshIndicator isRefreshing={isRefreshing} pull={pull} />
-      <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
+      {/* Copiar lista and (Admin-only) Reiniciar lista live in this small toolbar beside the
+          heading (UI redesign, no ticket) instead of the sticky bottom area below, which now holds
+          only Terminar compra: freeing that space is the whole point of shrinking both to icons,
+          since a phone screen has little room to spare above BottomNav. */}
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Lista de compras</h1>
+        <div className="-mr-2.5 flex items-center">
+          <IconButton
+            icon={CopyIcon}
+            label={hasNothingToCopy ? `Copiar lista. ${COPY_EMPTY_MESSAGE}` : "Copiar lista"}
+            disabled={hasNothingToCopy}
+            onClick={() => void handleCopyList()}
+          />
+          {/* Admin-only (ticket #12): hiding this from a non-Admin is only a courtesy — the real
+              enforcement is resetShoppingList()'s requireAdmin() check on the server (see
+              shopping-actions.ts). Tinted destructive so it reads as clearly different from
+              Copiar lista next to it, without the alarm of a solid destructive fill: Reset is
+              guarded by the confirmation dialog below, not by looking dangerous. */}
+          {isAdmin && (
+            <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+              <AlertDialogTrigger
+                disabled={isResettingList}
+                render={
+                  <IconButton
+                    icon={RotateCcwIcon}
+                    label="Reiniciar lista"
+                    className="text-destructive hover:bg-destructive/10"
+                  />
+                }
+              />
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>¿Seguro?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Todos los productos de la lista de compras volverán a la despensa. Ningún producto se elimina.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isResettingList}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    disabled={isResettingList}
+                    onClick={handleResetShoppingList}
+                  >
+                    Reiniciar lista
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </div>
       <p id={IN_CART_CHECKBOX_HINT_ID} className="sr-only">
         Marca un producto cuando ya esté en el carrito.
       </p>
@@ -335,20 +388,11 @@ export function ShoppingListView({
       )}
 
       {/* Sticky within the page's own scroll flow, right above the space AppLayout reserves for
-          the fixed BottomNav (pb-24), so it never scrolls behind it and never needs its own
-          height measured against BottomNav's. Copiar lista sits above Terminar compra, styled as
-          a plain outline button so it reads as clearly secondary next to Terminar compra's solid
-          primary fill. */}
-      <div className="sticky bottom-24 z-10 -mx-4 mt-6 flex flex-col gap-2 border-t bg-background px-4 py-3">
-        <button
-          type="button"
-          disabled={hasNothingToCopy}
-          aria-label={hasNothingToCopy ? `Copiar lista. ${COPY_EMPTY_MESSAGE}` : undefined}
-          onClick={() => void handleCopyList()}
-          className="w-full rounded-lg border px-4 py-3 text-base font-semibold disabled:opacity-50"
-        >
-          Copiar lista
-        </button>
+          the fixed BottomNav (pb-(--bottom-nav-offset)), so it never scrolls behind it and never
+          needs its own height measured against BottomNav's -- both read the same
+          --bottom-nav-offset custom property (see globals.css) as their one source of truth, so a
+          taller/shorter BottomNav can never leave this hidden behind it again. */}
+      <div className="sticky bottom-(--bottom-nav-offset) z-10 -mx-4 mt-6 border-t bg-background px-4 py-3">
         <button
           type="button"
           disabled={!hasInCart || isFinishingTrip}
@@ -357,41 +401,6 @@ export function ShoppingListView({
         >
           Terminar compra
         </button>
-
-        {/* Admin-only (ticket #12): hiding this from a non-Admin is only a courtesy — the real
-            enforcement is resetShoppingList()'s requireAdmin() check on the server (see
-            shopping-actions.ts). Styled as an outline button in the destructive color so it reads
-            as clearly different from Terminar compra's primary fill and from Copiar lista's
-            neutral outline, without the alarm of a solid destructive fill: Reset is guarded by the
-            confirmation dialog below, not by looking dangerous. */}
-        {isAdmin && (
-          <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-            <AlertDialogTrigger
-              disabled={isResettingList}
-              className="w-full rounded-lg border border-destructive/40 px-4 py-3 text-base font-semibold text-destructive disabled:opacity-50"
-            >
-              Reiniciar lista
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Seguro?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Todos los productos de la lista de compras volverán a la despensa. Ningún producto se elimina.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={isResettingList}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  disabled={isResettingList}
-                  onClick={handleResetShoppingList}
-                >
-                  Reiniciar lista
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
       </div>
     </div>
   );

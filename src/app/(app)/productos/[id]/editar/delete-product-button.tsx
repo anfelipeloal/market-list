@@ -8,14 +8,15 @@ import { ConfirmDeleteButton } from "@/app/(app)/confirm-delete-button";
 
 const DELETE_TOAST_ID = "delete-product";
 
-// "Eliminar" on the edit-Producto page (ticket #15): only rendered for an Admin (isAdmin, passed
-// down from the page's own requireUser() call) — hiding it from anyone else is a courtesy only,
-// deleteProduct's own requireAdmin() call (src/app/(app)/actions.ts) is the real enforcement.
-// Unlike deleting a Category (see ./delete-category-button.tsx's sibling in
-// categorias/[id]/editar/), deleting a Product has no refusal beyond "not found" — it is allowed
-// from any status (Pantry, Shopping List or In Cart — CONTEXT.md). The confirm-then-delete flow
-// itself lives in ConfirmDeleteButton (src/app/(app)/confirm-delete-button.tsx), shared with that
-// sibling and usuarios/user-row.tsx's own Eliminar.
+// The trash-icon trigger in EditProductPage's header (src/app/(app)/edit-page-header.tsx): only
+// rendered for an Admin (isAdmin, passed down from the page's own requireUser() call) — hiding it
+// from anyone else is a courtesy only, deleteProduct's own requireAdmin() call
+// (src/app/(app)/actions.ts) is the real enforcement. Unlike deleting a Category (see
+// ./delete-category-button.tsx's sibling in categorias/[id]/editar/), deleting a Product has no
+// refusal beyond "not found" — it is allowed from any status (Pantry, Shopping List or In Cart —
+// CONTEXT.md). The confirm-then-delete flow itself lives in ConfirmDeleteButton
+// (src/app/(app)/confirm-delete-button.tsx), shared with that sibling and usuarios/user-row.tsx's
+// own Eliminar.
 export function DeleteProductButton({
   productId,
   productName,
@@ -30,19 +31,17 @@ export function DeleteProductButton({
   if (!isAdmin) return null;
 
   return (
-    <div className="mt-6 rounded-xl border border-destructive/40 bg-card p-4">
-      <ConfirmDeleteButton
-        title={`¿Eliminar ${productName}?`}
-        description="Esta acción no se puede deshacer."
-        triggerClassName="w-full rounded-lg border border-destructive/40 px-4 py-3 text-base font-medium text-destructive disabled:opacity-50"
-        toastId={DELETE_TOAST_ID}
-        action={() => deleteProduct(productId)}
-        refusalMessage={deleteProductRefusalMessage}
-        onSuccess={() => {
-          toast(`${productName} se eliminó.`, { id: DELETE_TOAST_ID });
-          router.push("/");
-        }}
-      />
-    </div>
+    <ConfirmDeleteButton
+      label={`Eliminar ${productName}`}
+      title={`¿Eliminar ${productName}?`}
+      description="Esta acción no se puede deshacer."
+      toastId={DELETE_TOAST_ID}
+      action={() => deleteProduct(productId)}
+      refusalMessage={deleteProductRefusalMessage}
+      onSuccess={() => {
+        toast(`${productName} se eliminó.`, { id: DELETE_TOAST_ID });
+        router.push("/");
+      }}
+    />
   );
 }

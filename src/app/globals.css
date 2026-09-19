@@ -81,6 +81,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* BottomNav's own tap height (UI redesign: at least 64px per tab, no ticket) and its total
+     height once the device's bottom safe-area inset is added on top -- the ONE source of truth
+     the fixed BottomNav (src/app/(app)/bottom-nav.tsx), the content wrapper that keeps clear of it
+     (src/app/(app)/layout.tsx) and the sticky "Terminar compra" area above it
+     (src/app/(app)/lista/shopping-list-view.tsx) all read, so a taller/shorter bar can never drift
+     out of sync with the space reserved for it in those other two places again. */
+  --bottom-nav-height: 4rem;
+  --bottom-nav-offset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
 }
 
 .dark {
