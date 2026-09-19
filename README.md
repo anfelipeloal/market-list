@@ -37,7 +37,7 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
    FIRST_ADMIN_PIN=1234
    ```
 
-   `DATABASE_URL` is used by the app at runtime; `DIRECT_DATABASE_URL` by migrations and seeding. In hosted environments `DATABASE_URL` points at Supabase's pooler in transaction mode (port 6543) and `DIRECT_DATABASE_URL` at the direct connection.
+   `DATABASE_URL` is used by the app at runtime; `DIRECT_DATABASE_URL` only by migrations. In hosted environments `DATABASE_URL` points at Supabase's pooler in transaction mode (port 6543) and `DIRECT_DATABASE_URL` at the pooler in session mode (port 5432); see [Deploying](#deploying).
 
    `PIN_HASH_SECRET` keys the HMAC-SHA256 used to hash every PIN before it is stored (ADR-0001); use a long random string in hosted environments. `FIRST_ADMIN_NAME` and `FIRST_ADMIN_PIN` configure the first Admin, created automatically the first time anyone signs in while the Household has no Users yet (no manual seed step). All three are server-only. `PIN_HASH_SECRET` is required and checked on every sign-in attempt; `FIRST_ADMIN_NAME` and `FIRST_ADMIN_PIN` are only read and validated while the Users table is still empty. Each fails fast with a clear error when it's needed but missing.
 
@@ -47,14 +47,11 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
    npm run db:start
    ```
 
-4. Apply migrations and seed the starting Categories:
+4. Apply the migrations, which also create the starting Categories:
 
    ```sh
    npm run db:migrate
-   npm run db:seed
    ```
-
-   Seeding only inserts the starting Categories when the Household has none, so it is safe to run again.
 
 5. Start the app and open http://localhost:3000:
 
@@ -73,13 +70,33 @@ Business rules live in a pure domain core under `src/domain/` (no database, fram
 | `npm run lint` | Lint the project |
 | `npm run db:generate -- --name <change>` | Generate a migration after changing `src/db/schema.ts` |
 | `npm run db:migrate` | Apply pending migrations |
-| `npm run db:seed` | Seed the starting Categories into an empty Household |
 | `npm run db:stop` | Stop the local Supabase stack |
 
 ### Database rules
 
 - Every table enables Row Level Security with no policies, so Supabase's public key can read or write nothing. Only the Next.js server, with a privileged connection, touches data.
 - Schema changes go through Drizzle migrations in `drizzle/`; never edit the database by hand.
+- Seed data is a migration too (`drizzle/0005_seed_starting_categories.sql`), so it runs exactly once per database and never re-creates Categories an Admin deleted.
+- Write migrations that add rather than remove. Every deploy migrates before the new code goes live, and a failed build leaves the database one step ahead of the running code, so a rename or a dropped column should happen in two deploys: add the new form first, remove the old one once nothing uses it.
+
+## Deploying
+
+Vercel runs the `vercel-build` script, which applies pending migrations and then builds, so every deploy migrates its own database automatically: production migrates the production database, previews migrate staging. There is no manual migration or seed step.
+
+Set these in Vercel, separately for **Production** (production Supabase project) and **Preview** (staging project). Leave **Development** empty; `.env.local` covers it.
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Supabase *Connect* → **Transaction pooler** (port 6543), with `?sslmode=require` |
+| `DIRECT_DATABASE_URL` | Supabase *Connect* → **Session pooler** (port 5432), with `?sslmode=require` |
+| `PIN_HASH_SECRET` | A long random string; keep a copy somewhere safe |
+| `FIRST_ADMIN_NAME` | The first Admin's name |
+| `FIRST_ADMIN_PIN` | The first Admin's 4-digit PIN |
+
+- **Never change `PIN_HASH_SECRET` once anyone has signed in.** Every stored PIN is hashed with it, so a new secret locks out the whole Household.
+- Use the **Session pooler** for `DIRECT_DATABASE_URL`, not the Direct connection: Supabase's direct connection is IPv6-only on the free plan, and Vercel's build machines (like most home networks) are IPv4, so it hangs instead of failing. Never point migrations at the Transaction pooler.
+- Do not set `NODE_ENV` in Vercel: the build needs the development dependencies (`drizzle-kit`) installed.
+- The first sign-in on a new database creates the first Admin. After that, `FIRST_ADMIN_PIN` is never read again and can be removed from Vercel.
 
 ## Known limitations
 
