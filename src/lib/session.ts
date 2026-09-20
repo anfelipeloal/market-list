@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import { decideAdminAction } from "@/domain/access/permissions";
 import { SESSION_DURATION_MS, isSessionValid, sessionExpiresAt } from "@/domain/access/session";
-import { findSessionUser, insertSession } from "@/db/sessions";
+import { deleteSessionByTokenHash, findSessionUser, insertSession } from "@/db/sessions";
 import type { SignedInUser } from "@/db/users";
 import { SESSION_COOKIE_NAME } from "./session-cookie";
 import { generateSessionToken, hashSessionToken } from "./session-token";
@@ -45,6 +45,23 @@ export const requireUser = cache(async (): Promise<SignedInUser> => {
 
   return { id: session.id, name: session.name, isAdmin: session.isAdmin };
 });
+
+// Cerrar sesión (no ticket, requested directly; see src/app/(app)/session-actions.ts and
+// app-header.tsx): ends THIS browser's own Session and nothing else. Looks the cookie's token up
+// by the exact same hash requireUser() validates it against above, so it deletes the one database
+// row that request is actually using -- never every Session a User has open (unlike changePin in
+// src/app/(app)/usuarios/actions.ts, which ends all of that User's Sessions at once because a
+// changed PIN must lock out every device, not just this one). Safe with no cookie at all, or one
+// that no longer matches any row (already expired, already signed out elsewhere): there is simply
+// nothing to delete, and the cookie is cleared either way so the browser can't keep sending it.
+export async function endSession(): Promise<void> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (token) {
+    await deleteSessionByTokenHash(hashSessionToken(token));
+  }
+  cookieStore.delete(SESSION_COOKIE_NAME);
+}
 
 export type RequireAdminResult = { outcome: "allowed"; user: SignedInUser } | { outcome: "forbidden" };
 

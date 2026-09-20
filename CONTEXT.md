@@ -70,3 +70,8 @@ _Avoid_: Password, passcode
 Replacing a User's PIN with a new one.
 _UI_: Cambiar PIN
 _Avoid_: Reset PIN, recover PIN
+
+**Sign Out**:
+Ending the signed-in User's own session on this device, without affecting their sessions on any other device.
+_UI_: Cerrar sesión
+_Avoid_: Log off, disconnect

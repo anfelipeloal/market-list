@@ -25,8 +25,8 @@ const ADMIN_TAB: Tab = { href: "/usuarios", label: "Usuarios", icon: UsersIcon }
 // always reach the Despensa, the Lista de compras, and (for an Admin) Usuarios in one tap. Not
 // shown on /ingresar, which has no shared layout with the signed-in pages.
 //
-// Icon-above-label tabs, each at least --bottom-nav-height tall (UI redesign: "noticeably taller
-// ... and easier to tap", no ticket) -- that custom property (see globals.css) is this bar's own
+// Icon-above-label tabs, each --bottom-nav-height tall (56px, the usual height for this shape of
+// tab, no ticket) -- that custom property (see globals.css) is this bar's own
 // contribution to --bottom-nav-offset, the one source of truth it shares with the content
 // wrapper's bottom padding (src/app/(app)/layout.tsx) and the Lista de compras' sticky "Terminar
 // compra" area (src/app/(app)/lista/shopping-list-view.tsx): change the height here and both
