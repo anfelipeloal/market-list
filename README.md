@@ -86,9 +86,14 @@ Pass extra arguments straight after the script name. Unlike npm, pnpm forwards a
 
 ## Deploying
 
-Vercel runs the `vercel-build` script, which applies pending migrations and then builds, so every deploy migrates its own database automatically: production migrates the production database, previews migrate staging. There is no manual migration or seed step.
+`vercel.json` holds the deployment configuration, so it is versioned with the code instead of living only in the dashboard:
 
-Set these in Vercel, separately for **Production** (production Supabase project) and **Preview** (staging project). Leave **Development** empty; `.env.local` covers it.
+- `buildCommand` runs `pnpm vercel-build`, which applies pending migrations and then builds. Every deploy migrates its own database automatically; there is no manual migration or seed step.
+- `git.deploymentEnabled` deploys **only `main`**. No other branch produces a deployment, so no preview ever runs against real data and a half-finished migration on a branch cannot reach production. The trade-off is that nothing is exercised on a real deployment before it is live, which makes the weekly backup and local verification matter more.
+
+To turn previews back on later, delete the `git` block and give **Preview** its own Supabase project (never production's credentials: previews build on every branch, and every build migrates).
+
+Set these in Vercel for **Production**. Leave **Development** empty; `.env.local` covers it. Preview needs nothing while it is disabled.
 
 | Variable | Value |
 | --- | --- |
@@ -103,6 +108,7 @@ Set these in Vercel, separately for **Production** (production Supabase project)
 - Do not set `NODE_ENV` in Vercel: the build needs the development dependencies (`drizzle-kit`) installed.
 - Set `ENABLE_EXPERIMENTAL_COREPACK=1` in Vercel so it installs with the exact pnpm pinned in `packageManager`. The lockfile format (`9.0`) is shared by pnpm 9, 10 and 11, so without it Vercel may pick a different pnpm than the one this project is tested with, and the `allowBuilds` setting in `pnpm-workspace.yaml` was written by pnpm 11.
 - The first sign-in on a new database creates the first Admin. After that, `FIRST_ADMIN_PIN` is never read again and can be removed from Vercel.
+- `vercel.json`'s `buildCommand` overrides the dashboard's Build Command, so that setting can be left alone.
 
 ## Known limitations
 
