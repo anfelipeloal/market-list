@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 // routes").
 export default async function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
   // requireUser() (called inside requireAdmin()) reads the session cookie, which makes this route
-  // dynamic (see src/app/(app)/page.tsx). A non-Admin gets the same Spanish refusal as /usuarios
-  // itself (see src/app/(app)/usuarios/page.tsx); renameUser and changePin (./actions.ts,
+  // dynamic (see src/app/(app)/(despensa)/page.tsx). A non-Admin gets the same Spanish refusal as
+  // /usuarios itself (see src/app/(app)/usuarios/(indice)/page.tsx); renameUser and changePin (./actions.ts,
   // ../actions.ts) re-check this too.
   const admin = await requireAdmin();
   const { id } = await params;

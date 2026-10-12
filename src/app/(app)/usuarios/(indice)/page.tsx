@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { listUsers } from "@/db/users";
 import { sortByName } from "@/domain/catalog/names";
 import { requireAdmin } from "@/lib/session";
-import { ADMIN_ONLY_MESSAGE } from "./messages";
-import { NewUserForm } from "./new-user-form";
-import { UsersList } from "./users-list";
+import { ADMIN_ONLY_MESSAGE } from "../messages";
+import { NewUserForm } from "../new-user-form";
+import { UsersList } from "../users-list";
 
 export const metadata: Metadata = {
   title: "Usuarios",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 // itself from a non-Admin as a courtesy.
 export default async function UsersPage() {
   // requireUser() (called inside requireAdmin()) reads the session cookie, which makes this route
-  // dynamic (see src/app/(app)/page.tsx for the same pattern).
+  // dynamic (see src/app/(app)/(despensa)/page.tsx for the same pattern).
   const admin = await requireAdmin();
   if (admin.outcome === "forbidden") {
     return (

@@ -112,4 +112,6 @@ Set these in Vercel for **Production**. Leave **Development** empty; `.env.local
 
 ## Known limitations
 
+- Switching tabs shows each screen's skeleton (`loading.tsx`) instantly only in production. Next.js prefetches only in production builds, and the screens are dynamic, so in production it prefetches each tab's skeleton ahead of time; under `pnpm dev` nothing is prefetched and the skeleton arrives with the page's own response instead. A visible delay before the skeleton during development is expected, not a bug.
+
 - The offline service worker (`public/sw.js`, ticket #17) behaves differently under `pnpm dev` than it's expected to in production. Under `next dev`, a hard reload of `/lista` while offline is served correctly from the worker's cache at the HTTP level, but React does not hydrate on that response (most likely Turbopack's dev/HMR client blocking client bootstrap while its WebSocket can't connect — there is no such client in a production build). Before shipping a change to the offline behaviour, check against a production build (`next build && next start`) that: the "Sin conexión..." banner appears immediately on a cold offline reload of `/lista` (not only once already-hydrated and then disconnected), and that tapping a Product still shows the Spanish refusal instead of doing nothing.
