@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ShoppingListPage() {
-  // requireUser() reads the session cookie, which makes this route dynamic (see src/app/(app)/page.tsx).
+  // requireUser() reads the session cookie, which makes this route dynamic (see src/app/(app)/(despensa)/page.tsx).
   const user = await requireUser();
   const [categories, products] = await Promise.all([listCategories(), listProducts()]);
   const shoppingList = buildShoppingListView(categories, products);

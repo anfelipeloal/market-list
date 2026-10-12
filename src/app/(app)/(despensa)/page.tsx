@@ -2,7 +2,7 @@ import { listCategories } from "@/db/categories";
 import { listProducts } from "@/db/products";
 import { buildPantryView } from "@/domain/catalog/pantry";
 import { requireUser } from "@/lib/session";
-import { PantrySearch } from "./pantry-search";
+import { PantrySearch } from "../pantry-search";
 
 export default async function PantryPage() {
   // requireUser() reads the session cookie, which makes this route dynamic: the Pantry always

@@ -17,7 +17,7 @@ const TABS: readonly Tab[] = [
 
 // Admin-only (ticket #13): appended to TABS only for an Admin. Hiding it from a non-Admin is only
 // a courtesy — the real enforcement is requireAdmin() on /usuarios itself and on every action it
-// calls (see src/app/(app)/usuarios/page.tsx and actions.ts), exactly like Reiniciar lista's
+// calls (see src/app/(app)/usuarios/(indice)/page.tsx and actions.ts), exactly like Reiniciar lista's
 // button in ticket #12.
 const ADMIN_TAB: Tab = { href: "/usuarios", label: "Usuarios", icon: UsersIcon };
 
