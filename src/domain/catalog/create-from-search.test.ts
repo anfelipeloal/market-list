@@ -51,7 +51,7 @@ describe("offering to create a Product from the search", () => {
 
 describe("suggesting a Category for the new Product", () => {
   it("suggests the Category holding the most matches", () => {
-    expect(suggestCategoryId(results)).toBe("cat-lacteos");
+    expect(suggestCategoryId(results, results, "leche")).toBe("cat-lacteos");
   });
 
   it("breaks ties with the first Category A-Z", () => {
@@ -60,11 +60,36 @@ describe("suggesting a Category for the new Product", () => {
       { id: "cat-a", name: "Aseo", products: [{ id: "b", name: "B" }] },
       { id: "cat-l", name: "Lácteos", products: [{ id: "c", name: "C" }] },
     ];
-    expect(suggestCategoryId(tied)).toBe("cat-a");
+    expect(suggestCategoryId(tied, tied, "x")).toBe("cat-a");
   });
 
   it("suggests nothing when there are no matches", () => {
-    expect(suggestCategoryId([])).toBeUndefined();
-    expect(suggestCategoryId([{ id: "c", name: "Aseo", products: [] }])).toBeUndefined();
+    expect(suggestCategoryId([], [], "xyz")).toBeUndefined();
+    expect(suggestCategoryId([{ id: "c", name: "Aseo", products: [] }], [], "xyz")).toBeUndefined();
+  });
+
+  describe("when no Product contains the search text", () => {
+    const pantry: PantryCategory[] = [
+      { id: "cat-lacteos", name: "Lácteos y huevos", products: [{ id: "p1", name: "Leche" }] },
+      { id: "cat-frutas", name: "Frutas", products: [{ id: "p2", name: "Limón" }] },
+      { id: "cat-varios", name: "Varios", products: [{ id: "p3", name: "Sal" }] },
+    ];
+
+    it("falls back to Products whose every word appears in the search text", () => {
+      expect(suggestCategoryId([], pantry, "Leche deslactosada")).toBe("cat-lacteos");
+    });
+
+    it("compares those words ignoring capitalization and accents", () => {
+      expect(suggestCategoryId([], pantry, "LIMON tahiti")).toBe("cat-frutas");
+    });
+
+    it("matches whole words only, never fragments of a word", () => {
+      expect(suggestCategoryId([], pantry, "salsa de tomate")).toBeUndefined();
+    });
+
+    it("prefers Products containing the search text over the fallback", () => {
+      const containing = [{ id: "cat-bebidas", name: "Bebidas", products: [{ id: "p4", name: "Leche de soya" }] }];
+      expect(suggestCategoryId(containing, pantry, "leche de so")).toBe("cat-bebidas");
+    });
   });
 });

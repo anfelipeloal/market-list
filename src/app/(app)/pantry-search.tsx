@@ -166,7 +166,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
             key={trimmedSearch}
             name={cleanDisplayName(searchText)}
             categories={visiblePantry}
-            suggestedCategoryId={suggestCategoryId(filtered)}
+            suggestedCategoryId={suggestCategoryId(filtered, visiblePantry, searchText)}
             onMoveToShoppingList={moveProductAway}
           />
         </div>
