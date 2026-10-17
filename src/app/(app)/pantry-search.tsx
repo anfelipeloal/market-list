@@ -4,6 +4,7 @@ import { useCallback, useId, useMemo, useRef, useState } from "react";
 import { PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { CategoryForm } from "./category-form";
+import { CreateFromSearch } from "./create-from-search";
 import { IconLink } from "./icon-control";
 import { PANTRY_CHECKBOX_HINT_ID, PantryProductRow } from "./pantry-product-row";
 import { ProductForm } from "./product-form";
@@ -12,6 +13,8 @@ import { moveToShoppingList, returnToPantry } from "./shopping-actions";
 import { shoppingResultMessage } from "./shopping-messages";
 import { useRefreshOnReturn } from "./use-refresh-on-return";
 import type { PantryCategory } from "@/domain/catalog/pantry";
+import { shouldOfferCreate, suggestCategoryId } from "@/domain/catalog/create-from-search";
+import { cleanDisplayName } from "@/domain/catalog/names";
 import { searchPantry } from "@/domain/catalog/search-pantry";
 
 const UNDO_TIMEOUT_MS = 5000;
@@ -25,8 +28,10 @@ function moveToastId(productId: string): string {
 
 // Owns the search text and filters the Pantry view on every keystroke, entirely in the browser:
 // the server already sent every Category and Product, so there is no round trip while typing.
-// While a search is active, the add-Product and create-Category forms are hidden so the filtered
-// results stay focused; clearing the search restores the full Despensa with all its forms.
+// While a search is active, the per-Category add-Product forms and the create-Category form are
+// hidden so the filtered results stay focused; instead one create block tops the results (see
+// CreateFromSearch) unless a Product with exactly that name is already shown. Clearing the search
+// restores the full Despensa with all its forms.
 //
 // Also owns moving a Product to the Shopping List (ticket #9): a tap on its own row, or the
 // duplicate-create offer in ProductForm, both go through moveProductAway below, which hides the
@@ -127,6 +132,7 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
   const trimmedSearch = searchText.trim();
   const isSearching = trimmedSearch.length > 0;
   const filtered = useMemo(() => searchPantry(visiblePantry, searchText), [visiblePantry, searchText]);
+  const offerCreate = shouldOfferCreate(searchText, filtered);
   const matchCount = filtered.reduce((count, category) => count + category.products.length, 0);
 
   return (
@@ -153,6 +159,18 @@ export function PantrySearch({ pantry }: { pantry: PantryCategory[] }) {
           {isSearching ? (matchCount === 1 ? "1 producto encontrado" : `${matchCount} productos encontrados`) : ""}
         </p>
       </div>
+
+      {isSearching && offerCreate && visiblePantry.length > 0 ? (
+        <div className="mt-4">
+          <CreateFromSearch
+            key={trimmedSearch}
+            name={cleanDisplayName(searchText)}
+            categories={visiblePantry}
+            suggestedCategoryId={suggestCategoryId(filtered)}
+            onMoveToShoppingList={moveProductAway}
+          />
+        </div>
+      ) : null}
 
       {visiblePantry.length === 0 ? (
         <p className="mt-6 text-muted-foreground">Todavía no hay categorías.</p>
